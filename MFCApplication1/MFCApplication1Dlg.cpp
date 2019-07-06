@@ -963,6 +963,8 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 	}
 	else
 	{
+
+		/*
 		// ±£´æÍ¼Ïñ
 		if (m_bSave)
 		{
@@ -988,6 +990,7 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 				m_bSave = FALSE;
 			}
 		}
+		*/
 	}
 }
 
