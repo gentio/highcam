@@ -8,19 +8,25 @@
 
 #define WM_MSG	WM_USER+1
 
+#define FRAME_CUSUM_CNT	400				//原始图像累加和设置，步进为100帧，100-800可调
+
 // CMFCApplication1Dlg 对话框
 class CMFCApplication1Dlg : public CDialogEx
 {
 // 构造
 public:
 	CMFCApplication1Dlg(CWnd* pParent = NULL);	// 标准构造函数
-
-
+	// 离散脉冲慢速展示的判断
+	int f_cachebit_count;
+	BOOL f_cachebit;
+	//BYTE slowdata[400 * 250 * FRAME_CUSUM_CNT];
+	//BYTE slowdata_bit[400 * 250 * FRAME_CUSUM_CNT];
 
 	int enum_dev();
 	int open_dev();
 	int start_dev();
 	void DrawImage(BYTE *pRgb, int iWidth, int iHeight);
+	void DrawImage_slow(BYTE *pRgb, int iWidth, int iHeight);
 
 // 对话框数据
 #ifdef AFX_DESIGN_TIME
@@ -44,6 +50,7 @@ protected:
 	CComboBox m_wndDevList;
 	CComboBox COMBOFPS;
 	CStatic m_wndVideo;
+	CStatic m_slow;
 
 	CStatic m_fps;
 
