@@ -20,6 +20,7 @@
 #include <io.h>
 
 #include <Vfw.h>
+#include <omp.h>
 using namespace std;
 using namespace cv;
 #pragma comment (lib, "vfw32.lib")
@@ -31,8 +32,17 @@ using namespace cv;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+class cparamlist {
+public:
+	CMFCApplication1Dlg *windows;
+	BYTE *pInData;
+	ULONG uDataSize;
+	BYTE *pOutBuffer;
+	int iWidth;
+	int iHeight;
+};
 
-
+cparamlist A;
 
 #pragma comment (lib,".\\DTCCM2_SDK\\dtccm2.lib")
 UINT cunum;
@@ -83,11 +93,17 @@ void msg(LPCSTR lpszFmt, ...)
 	}
 }
 
-UINT __stdcall Thread1(LPVOID param)
+UINT __stdcall slow_Thread1(LPVOID param)
 {
 	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
-	for (int i = 0; i < 10000; i++)
-		msg("Thread from 1: %d\n", i);
+	BYTE *pInData = A.pInData;
+	ULONG uDataSize = A.uDataSize;
+	BYTE *pOutBuffer = A.pOutBuffer;
+	int iWidth = A.iWidth;
+	int iHeight = A.iHeight;
+
+	pDlg->Display_slow_data(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
+
 	return 0;
 }
 
@@ -865,6 +881,7 @@ void CMFCApplication1Dlg::WorkProc()
 	
 	while (m_bRunning)
 	{
+		WaitForSingleObject(slow_Thread1, INFINITE);
 		
 		//start = getTickCount();
 		iRet = GrabFrameEx(pBuffer, uSize, &uDataSize, &m_frameInfo, m_nDevID);
@@ -1072,9 +1089,14 @@ void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, B
 	//USHORT * dbuffer = new USHORT[iHeight*iWidth];
 	//memset(dbuffer, 0, iHeight*iWidth * 2);
 
-	uint itemp = 0;
-	uint iframe = 0;
-	uint frame;
+	//uint itemp = 0;
+	//uint iframe = 0;
+	//uint frame;
+
+	int itemp = 0;
+	int iframe = 0;
+	int frame;
+
 	uint framecount;
 	uint irow = 0;
 	uint itime = 0;
@@ -1092,7 +1114,8 @@ void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, B
 	Mat img(Size(iWidth, iHeight), CV_8UC1);
 	uchar *dbuffer = img.data;
 	memset(dbuffer, 0x0, iHeight*iWidth);
-	for (iframe = 0; iframe * 50 * 250 < length; iframe++)
+#pragma omp parallel for 
+	for (iframe = 0; iframe  < FRAME_CUSUM_CNT; iframe++)
 	{
 		frame = iframe;
 		for (irow = 0; irow < 250; irow++)
@@ -1135,6 +1158,7 @@ void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, B
 			}
 		}
 	}
+
 	resize(img, img, Size(rt_rect.Width(), rt_rect.Height()));
 	flip(img, img, 0);
 	imshow("RT", img);
@@ -1322,9 +1346,20 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 		// 离散脉冲展示和慢速展示
 		if (f_cachebit) {
 			f_cachebit = FALSE;
-			Display_slow_data(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
+			
+			A.windows = this;
+			A.iHeight = iHeight;
+			A.iWidth = iWidth;
+			A.pInData = pInData;
+			A.pOutBuffer = pOutBuffer;
+			A.uDataSize = uDataSize;
+
+
+			m_hThread = (HANDLE)_beginthreadex(NULL, 0, &slow_Thread1, this, 0, 0);
+			//Display_slow_data(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
 		}
-		Display_slow(iWidth,iHeight);
+		if (f_cachebit_count)
+			Display_slow(iWidth,iHeight);
 	}
 }
 
@@ -1415,6 +1450,7 @@ void CMFCApplication1Dlg::OnBnClickedCam()
 	m_bSave = FALSE;
 	m_bRunning = FALSE;
 	WaitForSingleObject(m_hThread, INFINITE);
+	WaitForSingleObject(slow_Thread1, INFINITE);
 	m_hThread = INVALID_HANDLE_VALUE;
 	
 	int iRet = CloseDevice(m_nDevID);
