@@ -1188,7 +1188,8 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 	uint* label = new uint[250 * 400];
 	uint* gray_first = new uint[250 * 400];
 	uchar* gray = new uchar[250 * 400];
-
+	uchar* bit_img = new uchar[250 * 400];
+	
 
 	for (int jj = 0; jj < 250 * 40 / 8; jj++)
 	{
@@ -1208,6 +1209,7 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 	for (iframe = 0; iframe < FRAME_CUSUM_CNT; iframe++)
 	{
 		frame = iframe;
+		memset(bit_img, 0x0, iWidth*iHeight);
 		for (irow = 0; irow < 250; irow++)
 		{
 			for (itime = 0; itime < 50; itime++)//每行52个字节
@@ -1217,41 +1219,49 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 				{
 					interval[8 * 50 * irow + 8 * itime] = frame - label[8 * 50 * irow + 8 * itime];
 					label[8 * 50 * irow + 8 * itime] = frame;
+					bit_img[8 * 50 * irow + 8 * itime] = 0xff;
 				}
 				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q2)
 				{
 					interval[8 * 50 * irow + 8 * itime + 1] = frame - label[8 * 50 * irow + 8 * itime + 1];
 					label[8 * 50 * irow + 8 * itime + 1] = frame;
+					bit_img[8 * 50 * irow + 8 * itime+1] = 0xff;
 				}
 				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q3)
 				{
 					interval[8 * 50 * irow + 8 * itime + 2] = frame - label[8 * 50 * irow + 8 * itime + 2];
 					label[8 * 50 * irow + 8 * itime + 2] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 2] = 0xff;
 				}
 				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q4)
 				{
 					interval[8 * 50 * irow + 8 * itime + 3] = frame - label[8 * 50 * irow + 8 * itime + 3];
 					label[8 * 50 * irow + 8 * itime + 3] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 3] = 0xff;
 				}
 				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q5)
 				{
 					interval[8 * 50 * irow + 8 * itime + 4] = frame - label[8 * 50 * irow + 8 * itime + 4];
 					label[8 * 50 * irow + 8 * itime + 4] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 4] = 0xff;
 				}
 				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q6)
 				{
 					interval[8 * 50 * irow + 8 * itime + 5] = frame - label[8 * 50 * irow + 8 * itime + 5];
 					label[8 * 50 * irow + 8 * itime + 5] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 5] = 0xff;
 				}
 				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q7)
 				{
 					interval[8 * 50 * irow + 8 * itime + 6] = frame - label[8 * 50 * irow + 8 * itime + 6];
 					label[8 * 50 * irow + 8 * itime + 6] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 6] = 0xff;
 				}
 				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q8)
 				{
 					interval[8 * 50 * irow + 8 * itime + 7] = frame - label[8 * 50 * irow + 8 * itime + 7];
 					label[8 * 50 * irow + 8 * itime + 7] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 7] = 0xff;
 				}
 			}
 		}
@@ -1268,6 +1278,7 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 			}
 		}
 		memcpy(slowdata + iframe * 400 * 250, gray, 400 * 250);
+		memcpy(slowdata_bit + iframe * 400 * 250, bit_img, 400 * 250);
 	}
 
 }
@@ -1277,12 +1288,22 @@ void CMFCApplication1Dlg::Display_slow(int iWidth, int iHeight)
 	Mat img(Size(iWidth, iHeight), CV_8UC1);
 	uchar *data = img.data;
 	//memset(data, 0x0, iHeight*iWidth);
-
-	memcpy(data, slowdata + (f_cachebit_count + 200)*iWidth*iHeight, iWidth*iHeight);
+	int fps = 10;
+	memcpy(data, slowdata + (f_cachebit_count*fps + 150)*iWidth*iHeight, iWidth*iHeight);
 	
 	resize(img, img, Size(sl_rect.Width(), sl_rect.Height()));
 	flip(img, img, 0);
 	imshow("SL", img);
+
+	Mat bit_img(Size(iWidth, iHeight), CV_8UC1);
+	data = bit_img.data;
+	//memset(data, 0x0, iHeight*iWidth);
+	
+	memcpy(data, slowdata_bit + (f_cachebit_count*fps + 150)*iWidth*iHeight, iWidth*iHeight);
+
+	resize(bit_img, bit_img, Size(pl_rect.Width(), pl_rect.Height()));
+	flip(bit_img, bit_img, 0);
+	imshow("PL", bit_img);
 
 }
 
