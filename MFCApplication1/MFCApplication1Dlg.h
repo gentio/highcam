@@ -27,8 +27,12 @@ public:
 	int start_dev();
 	void DrawImage(BYTE *pRgb, int iWidth, int iHeight);
 	void DrawImage_slow(BYTE *pRgb, int iWidth, int iHeight);
+	void Display_image_from_camera(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight);
+	void Display_image_byself(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight);
+	void Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight);
+	void Display_slow(int iWidth, int iHeight);
 
-// 对话框数据
+	// 对话框数据
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_MFCAPPLICATION1_DIALOG };
 #endif
@@ -66,6 +70,8 @@ protected:
 	int     m_nDevID;
 	BOOL    m_bRunning;
 	HANDLE  m_hThread;
+	HANDLE  m_hThread1;
+	HANDLE  m_hThread2;
 
 	UINT    m_uFrameCnt;
 	UINT    m_uImageBytes;
@@ -89,6 +95,10 @@ protected:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	DECLARE_MESSAGE_MAP()
 public:
+
+	CRect rt_rect; // 实时展示窗口大小
+	CRect pl_rect; // 脉冲展示
+	CRect sl_rect; // 缓慢展示
 	void WorkProc();
 	afx_msg void Found_Cam();
 	afx_msg void OnBnClickedCam();
