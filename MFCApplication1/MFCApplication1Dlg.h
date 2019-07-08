@@ -69,9 +69,16 @@ protected:
 	BOOL    m_bOpen;
 	int     m_nDevID;
 	BOOL    m_bRunning;
+	BOOL    m_rawproc = FALSE;
+	BOOL    m_bitproc = FALSE;
+
 	HANDLE  m_hThread;
-	HANDLE  m_hThread1;
-	HANDLE  m_hThread2;
+	HANDLE  m_hThread_slow; // 自己的脉冲窗口展示线程 记录
+	HANDLE  m_hThread_self; //自己的时间窗口展示线程 记录
+	HANDLE  m_Mutex;
+	HANDLE  m_Event;
+	int cache_count; // 缓冲区计数
+
 
 	UINT    m_uFrameCnt;
 	UINT    m_uImageBytes;
