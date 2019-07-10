@@ -57,6 +57,8 @@ protected:
 	CStatic m_slow;
 
 	CStatic m_fps;
+	CStatic m_rawdata;
+	CStatic m_slowimg;
 
 	float m_fAvdd;
 	float m_fDovdd;
@@ -64,19 +66,30 @@ protected:
 	float m_fAfvcc;
 	float m_fVpp;
 	float m_fMclk;
+
 	float m_fSavetime;
+
+	int   m_package_count; // 要保存的包计数
+	BOOL  m_Save_Package;   // 控制保存raw的标志变量
 
 	BOOL    m_bOpen;
 	int     m_nDevID;
 	BOOL    m_bRunning;
 	BOOL    m_rawproc = FALSE;
 	BOOL    m_bitproc = FALSE;
+	BOOL    m_raw2video = FALSE;
 
 	HANDLE  m_hThread;
 	HANDLE  m_hThread_slow; // 自己的脉冲窗口展示线程 记录
 	HANDLE  m_hThread_self; //自己的时间窗口展示线程 记录
+	HANDLE  m_hThread_save; // 保存线程的状态记录
+	HANDLE  m_hThread_raw2video = INVALID_HANDLE_VALUE; //离线线程记录
+
 	HANDLE  m_Mutex;
+	HANDLE  m_rawMutex;
 	HANDLE  m_Event;
+	HANDLE  m_rawEvent;
+	
 	int cache_count; // 缓冲区计数
 
 
@@ -107,6 +120,12 @@ public:
 	CRect pl_rect; // 脉冲展示
 	CRect sl_rect; // 缓慢展示
 	void WorkProc();
+	void load_and_proc();
+
+	void save_raw_data();
 	afx_msg void Found_Cam();
 	afx_msg void OnBnClickedCam();
+	afx_msg void SetSaveTime();
+	
+	afx_msg void raw2video();
 };

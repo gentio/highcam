@@ -1,14 +1,12 @@
 
 // MFCApplication1Dlg.cpp : 实现文件
-//
-
 #include "stdafx.h"
 #include "MFCApplication1.h"
 #include "MFCApplication1Dlg.h"
 #include "afxdialogex.h"
 #include<tchar.h>
 #include <opencv2/opencv.hpp>
-//#include <opencv.hpp>
+
 
 #include <Vfw.h>
 #include <fstream>
@@ -20,7 +18,7 @@
 #include <io.h>
 
 #include <Vfw.h>
-#include <omp.h>
+
 using namespace std;
 using namespace cv;
 #pragma comment (lib, "vfw32.lib")
@@ -48,10 +46,14 @@ cparamlist A;
 UINT cunum;
 UINT time_sv, fre, cu_e;
 
+// 放慢倍数 = 1/slow_rate *20000
+int slow_rate = 10; 
+
+
 BYTE *slowdata = new BYTE[FRAME_CUSUM_CNT * 250 * 400];
 BYTE *slowdata_bit = new BYTE[FRAME_CUSUM_CNT * 250 * 400];
 BYTE *raw_data = new BYTE[FRAME_CUSUM_CNT * 250 * 80 * 5]; // 分配五个原始数据包的缓冲区
-
+BYTE *save_data_buffer = new BYTE[FRAME_CUSUM_CNT * 250 * 80];
 
 UINT __stdcall RemoteDebugThread(LPVOID param)
 {
@@ -122,6 +124,20 @@ UINT __stdcall slow_Thread1(LPVOID param)
 	return 0;
 }
 
+UINT __stdcall save_Thread(LPVOID param)
+{
+	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
+	pDlg->save_raw_data();
+	return 0;
+}
+
+UINT __stdcall offline_data_proc(LPVOID param)
+{
+	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
+	pDlg->load_and_proc();
+	return 0;
+}
+
 
 class CAboutDlg : public CDialogEx
 {
@@ -163,8 +179,6 @@ int CMFCApplication1Dlg::enum_dev()
 	char *DeviceName[12] = { 0 };
 	int DeviceNum;
 	int i;
-
-	//m_wndDevList.ResetContent();
 
 	EnumerateDevice(DeviceName, 12, &DeviceNum);
 
@@ -279,8 +293,7 @@ int CMFCApplication1Dlg::start_dev()
 		// 启动工作线程
 		m_bRunning = TRUE;
 		m_hThread = (HANDLE)_beginthreadex(NULL, 0, &RemoteDebugThread, this, 0, 0);
-	//	m_hThread1 = (HANDLE)_beginthreadex(NULL, 0, &Thread1, this, 0, 0);
-	//	m_hThread2 = (HANDLE)_beginthreadex(NULL, 0, &Thread2, this, 0, 0);
+
 		if (m_hThread != INVALID_HANDLE_VALUE)
 		{
 			//GetDlgItem(IDC_BUTTON_START)->SetWindowText("stop");
@@ -294,7 +307,6 @@ int CMFCApplication1Dlg::start_dev()
 		{
 			CFile file;
 
-			// 估计这里是保存了10个数据包，pic.dat大概有48m
 			file.Open("pic.dat", CFile::modeCreate | CFile::modeNoTruncate | CFile::modeReadWrite, NULL);
 			//file.Write(STOREAGE, cu_e * 400 * 250);
 			file.Close();
@@ -303,117 +315,14 @@ int CMFCApplication1Dlg::start_dev()
 		m_bSave = FALSE;
 		m_bRunning = FALSE;
 		WaitForSingleObject(m_hThread, INFINITE);
-	//	WaitForSingleObject(m_hThread1, INFINITE);
-	//	WaitForSingleObject(m_hThread2, INFINITE);
+	
 		m_hThread = INVALID_HANDLE_VALUE;
 		//GetDlgItem(IDC_BUTTON_START)->SetWindowText("start");
 	}
 	return 0;
 }
 
-void CMFCApplication1Dlg::DrawImage(BYTE *pRgb, int iWidth, int iHeight)
-{
-	BYTE *pRGB = pRgb;
-	BITMAPINFOHEADER bmpInfoHeader;
 
-	memset(&bmpInfoHeader, 0x00, sizeof(BITMAPINFOHEADER));
-	bmpInfoHeader.biWidth = 4384;
-	bmpInfoHeader.biHeight = 3288;
-	bmpInfoHeader.biSize = sizeof(bmpInfoHeader);
-	bmpInfoHeader.biPlanes = 1;
-	bmpInfoHeader.biBitCount = 24;
-	bmpInfoHeader.biCompression = BI_RGB;
-	bmpInfoHeader.biSizeImage = 0;
-
-	HWND hWnd = GetDlgItem(RT_Display)->GetSafeHwnd();
-
-	HDRAWDIB bmpDC;
-	HDC hdc = ::GetDC(hWnd);
-	bmpDC = DrawDibOpen();
-
-	CRect rect;
-	int iDispWidth = 0;
-	int iDispHeight = 0;
-
-	//CameraGetImageSize(m_iWorkCam, &bROI, &iHOff, &iVOff, &iWidth, &iHeight);
-	bmpInfoHeader.biSize = sizeof(bmpInfoHeader);
-	bmpInfoHeader.biWidth = iWidth;
-	bmpInfoHeader.biHeight = iHeight;
-	bmpInfoHeader.biPlanes = 1;
-	bmpInfoHeader.biBitCount = 24;
-	bmpInfoHeader.biCompression = BI_RGB;
-	bmpInfoHeader.biSizeImage = 0;
-	::GetWindowRect(hWnd, &rect);
-	iDispWidth = rect.Width();
-	iDispHeight = rect.Height();
-
-	DrawDibDraw(bmpDC, hdc,
-		0, 0,
-		iDispWidth, iDispHeight,
-		&bmpInfoHeader,
-		pRGB,
-		0, 0, -1, -1,
-		0);
-
-	if (bmpDC != NULL)
-	{
-		DrawDibClose(bmpDC);
-		bmpDC = NULL;
-	}
-	::ReleaseDC(hWnd, hdc);
-}
-
-void CMFCApplication1Dlg::DrawImage_slow(BYTE *pRgb, int iWidth, int iHeight)
-{
-	BYTE *pRGB = pRgb;
-	BITMAPINFOHEADER bmpInfoHeader;
-
-	memset(&bmpInfoHeader, 0x00, sizeof(BITMAPINFOHEADER));
-	bmpInfoHeader.biWidth = 4384;
-	bmpInfoHeader.biHeight = 3288;
-	bmpInfoHeader.biSize = sizeof(bmpInfoHeader);
-	bmpInfoHeader.biPlanes = 1;
-	bmpInfoHeader.biBitCount = 24;
-	bmpInfoHeader.biCompression = BI_RGB;
-	bmpInfoHeader.biSizeImage = 0;
-
-	HWND hWnd = GetDlgItem(Slow_Display)->GetSafeHwnd();
-
-	HDRAWDIB bmpDC;
-	HDC hdc = ::GetDC(hWnd);
-	bmpDC = DrawDibOpen();
-
-	CRect rect;
-	int iDispWidth = 0;
-	int iDispHeight = 0;
-
-	//CameraGetImageSize(m_iWorkCam, &bROI, &iHOff, &iVOff, &iWidth, &iHeight);
-	bmpInfoHeader.biSize = sizeof(bmpInfoHeader);
-	bmpInfoHeader.biWidth = iWidth;
-	bmpInfoHeader.biHeight = iHeight;
-	bmpInfoHeader.biPlanes = 1;
-	bmpInfoHeader.biBitCount = 24;
-	bmpInfoHeader.biCompression = BI_RGB;
-	bmpInfoHeader.biSizeImage = 0;
-	::GetWindowRect(hWnd, &rect);
-	iDispWidth = rect.Width();
-	iDispHeight = rect.Height();
-
-	DrawDibDraw(bmpDC, hdc,
-		0, 0,
-		iDispWidth, iDispHeight,
-		&bmpInfoHeader,
-		pRGB,
-		0, 0, -1, -1,
-		0);
-
-	if (bmpDC != NULL)
-	{
-		DrawDibClose(bmpDC);
-		bmpDC = NULL;
-	}
-	::ReleaseDC(hWnd, hdc);
-}
 
 
 
@@ -424,13 +333,14 @@ CMFCApplication1Dlg::CMFCApplication1Dlg(CWnd* pParent /*=NULL*/)
 	, m_nDevID(0)
 	, m_bRunning(FALSE)
 	, m_hThread(INVALID_HANDLE_VALUE)
+	, m_hThread_save(INVALID_HANDLE_VALUE)
 	, m_fAvdd(2.8f)
 	, m_fDovdd(1.8f)
-	, m_fDvdd(1.2f)
-	, m_fAfvcc(2.8f)
-	, m_fVpp(0.0f)
-	, m_fMclk(12.0f)
-	, m_fSavetime(2000.0f)
+	, m_fDvdd(1.8f)
+	, m_fAfvcc(1.8f)
+	, m_fVpp(5.0f)
+	, m_fMclk(10.0f)
+	, m_fSavetime(200.0f)
 	, m_uFrameCnt(0)
 	, m_uImageBytes(0)
 	, m_fFrameRate(0.0f)
@@ -439,12 +349,17 @@ CMFCApplication1Dlg::CMFCApplication1Dlg(CWnd* pParent /*=NULL*/)
 	, m_Video(FALSE)
 	, m_bSave(FALSE)
 	, cache_count(0)
+	, m_Save_Package(FALSE)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-
-
-
-	
+	/*
+	m_fMclk = 10.0;
+	m_fAvdd = 2.8;
+	m_fDovdd = 1.8;
+	m_fDvdd = 1.8;
+	m_fAfvcc = 1.8;
+	m_fVpp = 5.0;
+	*/
 }
 
 void CMFCApplication1Dlg::DoDataExchange(CDataExchange* pDX)
@@ -454,6 +369,10 @@ void CMFCApplication1Dlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, RT_Display, m_wndVideo);
 	//DDX_Control(pDX, Slow_Display, m_slow);
 	DDX_Control(pDX, RT_FPS, m_fps);
+	DDX_Control(pDX, Rawdata, m_rawdata);
+	DDX_Control(pDX, SLOWIMG, m_slowimg);
+
+	DDX_Text(pDX, SAVEMS, m_fSavetime);
 }
 
 BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
@@ -464,6 +383,8 @@ BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(Find_cam, &CMFCApplication1Dlg::Found_Cam)
 	ON_BN_CLICKED(CLOSE_CAM, &CMFCApplication1Dlg::OnBnClickedCam)
+	ON_BN_CLICKED(SET_SAVETIME, &CMFCApplication1Dlg::SetSaveTime)
+	ON_BN_CLICKED(Offline_Data2, &CMFCApplication1Dlg::raw2video)
 END_MESSAGE_MAP()
 
 
@@ -527,6 +448,7 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 
 	// TODO: 在此添加额外的初始化代码
 	m_Mutex = CreateMutex(NULL, FALSE, NULL);
+	m_rawMutex = CreateMutex(NULL, FALSE, NULL);
 
 	f_cachebit = 0;
 	// 500毫秒的定时器，用作状态刷新
@@ -545,13 +467,9 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	}
 	else
 	{
-		enum_dev();
 		open_dev();
 		start_dev();
 	}
-
-	
-
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -609,10 +527,6 @@ HCURSOR CMFCApplication1Dlg::OnQueryDragIcon()
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
-
-
-
-
 void CMFCApplication1Dlg::WorkProc()
 {
 	int iRet;
@@ -626,13 +540,14 @@ void CMFCApplication1Dlg::WorkProc()
 	msg("The value of m_fAfvcc is: %f\n", m_fAfvcc);
 	msg("The value of m_fVpp is: %f\n", m_fVpp);
 	*/
+	/*
 	m_fMclk = 10.0;
 	m_fAvdd = 2.8;
 	m_fDovdd = 1.8;
 	m_fDvdd = 1.8;
 	m_fAfvcc = 1.8;
 	m_fVpp = 5.0;
-
+	*/
 	SensorIniFile SensorIni(m_strIniFile);
 
 	if (SensorIni.LoadIniFile())
@@ -732,10 +647,6 @@ void CMFCApplication1Dlg::WorkProc()
 	SampleSpeed[4] = 200;
 
 
-	char tmpchar[50];
-	sprintf(tmpchar, "%.6f", m_fAvdd);
-	msg(tmpchar);
-
 	// 设置电压斜率
 	if (PmuSetRise(Power, Rise, 5, m_nDevID) != DT_ERROR_OK)
 	{
@@ -798,15 +709,13 @@ void CMFCApplication1Dlg::WorkProc()
 		msg("设置量程失败！\r\n");
 	}
 
-	msg("The Hz is: %f\n", m_fMclk);
-	m_fMclk = 10.0;
 	iRet = SetSensorClock(TRUE, (USHORT)(m_fMclk * 10), m_nDevID);
 	if (iRet != DT_ERROR_OK)
 	{
 		msg("Set MCLK failed with err:%d\n", iRet);
 	}
 	Sleep(50);
-	msg("The Hz is: %f\n", m_fMclk);
+
 
 	// 设置reset pin, pwdn pin
 	BYTE Pwdn2 = 0;
@@ -890,7 +799,6 @@ void CMFCApplication1Dlg::WorkProc()
 	
 	while (m_bRunning)
 	{
-		//WaitForSingleObject(slow_Thread1, INFINITE);
 		
 		//start = getTickCount();
 		iRet = GrabFrameEx(pBuffer, uSize, &uDataSize, &m_frameInfo, m_nDevID);
@@ -919,26 +827,18 @@ void CMFCApplication1Dlg::WorkProc()
 				cache_count = 0;
 			ReleaseMutex(m_Mutex);
 
+			// 是否保存缓存包
+			if (m_package_count > 0) {
+				WaitForSingleObject(m_rawMutex, INFINITE);
+				memcpy(save_data_buffer, pBuffer, FRAME_CUSUM_CNT * 250 * 50);
+				ReleaseMutex(m_rawMutex);
+				SetEvent(m_rawEvent);
 
+			}
+			
 			DataProc(bOrgImage, pBuffer, uDataSize, pOutBuffer, iWidth, iHeight);
 		}
 		
-		/*
-		switch (iRet) {
-		case DT_ERROR_OK:
-			msg("DT_ERROR_OR\n");
-			break;
-		case DT_ERROR_TIME_OUT:
-			msg("DT_ERROR_TIME_OUT\n");
-			break;
-		case DT_ERROR_FAILED:
-			msg("DT_ERROR_FAILED\n");
-			break;
-		case DT_ERROR_INTERNAL_ERROR:
-			msg("DT_ERROR_INTERNAL_ERROR\n");
-			break;
-		}
-		*/
 	}
 
 
@@ -991,14 +891,51 @@ void CMFCApplication1Dlg::WorkProc()
 
 	msg("WorkProc Exit\n");
 }
+
+void CMFCApplication1Dlg::save_raw_data()
+{
+	BYTE *buffer = new BYTE[FRAME_CUSUM_CNT * 250 * 50];
+	int count = 0;
+	msg("Saving %d data\n", m_package_count);
+	while (m_package_count > 0) {
+		WaitForSingleObject(m_rawEvent, INFINITE);
+		WaitForSingleObject(m_rawMutex, INFINITE);
+		memcpy(buffer, save_data_buffer, FRAME_CUSUM_CNT * 250 * 50);
+		ReleaseMutex(m_rawMutex);
+
+		SYSTEMTIME tm;
+		CString str;
+		CFile file;
+		::GetLocalTime(&tm);
+		str.Format(".//temdata//%d.dat", count);
+		if (file.Open(str, CFile::modeCreate | CFile::modeWrite, NULL))
+		{
+			file.Write(buffer, FRAME_CUSUM_CNT * 250 * 50);
+			file.Close();
+			msg("写入文件%s\r\n", str);
+		}
+		else
+		{
+			msg("Can't open the file to save\n");
+		}
+		count++;
+		m_package_count--;
+		
+	}
+
+	delete[] buffer;
+	m_Save_Package = FALSE;
+	m_package_count = 0;
+	msg("保存数据成功\n");
+
+}
+
 void CMFCApplication1Dlg::Display_image_from_camera(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight)
 {
 
 	int i, j;
-	BYTE *p;
 	int iPixels = iWidth * iHeight;
 	USHORT *pOut = (USHORT*)pOutBuffer;
-
 
 	// 此时，获得是预先累加过的图像数据，一次800帧        
 	// 每个字节保存了两个像素的累加和，4bit一个，由于进位的关系，4bit最多只能保存15次累加和信息；
@@ -1058,62 +995,33 @@ void CMFCApplication1Dlg::Display_image_from_camera(BYTE *pInData, ULONG uDataSi
 			p6++;
 		}
 	}
-
-	// 显示图像
-	BYTE *pRgb = new BYTE[iWidth*iHeight * 3];
+	// 把原先的drawImage删了，改成opencv里的图像显示，但还没测试
 	pOut = (USHORT*)pOutBuffer;
-	p = pRgb;
-	if (pRgb != NULL)
+	Mat img(Size(iWidth, iHeight), CV_8UC1);
+	uchar *datain = img.data;
+	for (i = 0; i < iPixels; i++)
 	{
-		// 转RGB图像
-		for (i = 0; i < iPixels; i++)
-		{
-			*p = (pOut[i] * 2 > 255) ? 255 : (pOut[i] * 2 & 0xff);
-			*(p + 1) = *p;
-			*(p + 2) = *p;
-			p += 3;
-		}
-		if (m_bSave)
-		{
-			if (cunum < cu_e)
-			{
-				for (i = 0; i < 400 * 250; i++)
-				{
-					//STOREAGE[cunum * 400 * 250 + i] = pRgb[3 * i];
-				}
-				cunum++;
-			}
-			if (cunum == cu_e)
-			{
-				msg("数据保存完成，请点击stop按钮");
-				cunum++;
-				m_bSave = FALSE;
-			}
-		}
-		DrawImage(pRgb, iWidth, iHeight);
-
-		delete[] pRgb;
+		datain[i] = (pOut[i] * 2 > 255) ? 255 : (pOut[i] * 2 & 0xff);
 	}
+	resize(img, img, Size(rt_rect.Width(), rt_rect.Height()));
+	flip(img, img, 0);
+	imshow("RT", img);
+	waitKey(5);
+	Sleep(5);
+	
 }
 void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight)
 {
-//	int i, j;
-//	BYTE *p;
+
 	int iPixels = iWidth * iHeight;
 	USHORT *pOut = (USHORT*)pOutBuffer;
 
-	//USHORT * dbuffer = new USHORT[iHeight*iWidth];
-	//memset(dbuffer, 0, iHeight*iWidth * 2);
-
-	//uint itemp = 0;
-	//uint iframe = 0;
-	//uint frame;
 
 	int itemp = 0;
 	int iframe = 0;
 	int frame;
 
-//	uint framecount;
+
 	uint irow = 0;
 	uint itime = 0;
 	uchar q1 = 1;
@@ -1127,14 +1035,12 @@ void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, B
 
 	int length = FRAME_CUSUM_CNT * 50 * 250;
 	uchar *pulse = new uchar[FRAME_CUSUM_CNT * 250 * 50];
-	//Mat img(Size(iWidth, iHeight), CV_8UC1);
 
+	Mat img(Size(iWidth, iHeight), CV_8UC1);
+	Mat img1(Size(rt_rect.Width(), rt_rect.Height()), CV_8UC1);
 
-	//uchar *dbuffer = img.data;
 	while (m_rawproc) {
 		WaitForSingleObject(m_Event, INFINITE);
-
-		
 
 		WaitForSingleObject(m_Mutex, INFINITE);
 		if (cache_count)
@@ -1144,10 +1050,11 @@ void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, B
 
 		ReleaseMutex(m_Mutex);
 
-		Mat img(Size(iWidth, iHeight), CV_8UC1);
+		
+		memset(img.data, 0x0, iHeight*iWidth);
+		memset(img1.data, 0x0, rt_rect.Width()* rt_rect.Height());
 		uchar *dbuffer = img.data;
-		memset(dbuffer, 0x0, iHeight*iWidth);
-//#pragma omp parallel for 
+		
 		for (iframe = 0; iframe < FRAME_CUSUM_CNT; iframe++)
 		{
 			frame = iframe;
@@ -1191,20 +1098,12 @@ void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, B
 				}
 			}
 		}
-		resize(img, img, Size(rt_rect.Width(), rt_rect.Height()));
-		flip(img, img, 0);
-		imshow("RT", img);
+		resize(img, img1, Size(rt_rect.Width(), rt_rect.Height()));
+		flip(img1, img1, 0);
+		imshow("RT", img1);
 		waitKey(5);
 		Sleep(5);
 	}
-
-
-
-
-	//resize(img, img, Size(rt_rect.Width(), rt_rect.Height()));
-	//flip(img, img, 0);
-	//imshow("RT", img);
-	
 }
 void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight)
 {
@@ -1240,7 +1139,7 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 	uint itemp = 0;
 	uint iframe = 0;
 	uint frame;
-//	uint framecount;
+
 	uint irow = 0;
 	uint itime = 0;
 
@@ -1328,9 +1227,7 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 		}
 
 		Display_slow(iWidth, iHeight);
-
 	}
-
 
 	delete[] pulse;
 	delete [] interval;
@@ -1345,8 +1242,8 @@ void CMFCApplication1Dlg::Display_slow(int iWidth, int iHeight)
 	Mat img(Size(iWidth, iHeight), CV_8UC1);
 	uchar *data = img.data;
 	memset(data, 0x0, iHeight*iWidth);
-	int fps = 10;
-	memcpy(data, slowdata + (f_cachebit_count*fps + 150)*iWidth*iHeight, iWidth*iHeight);
+
+	memcpy(data, slowdata + (f_cachebit_count*slow_rate + 150)*iWidth*iHeight, iWidth*iHeight);
 	
 	resize(img, img, Size(sl_rect.Width(), sl_rect.Height()));
 	flip(img, img, 0);
@@ -1357,7 +1254,7 @@ void CMFCApplication1Dlg::Display_slow(int iWidth, int iHeight)
 	data = bit_img.data;
 	memset(data, 0x0, iHeight*iWidth);
 	
-	memcpy(data, slowdata_bit + (f_cachebit_count*fps + 150)*iWidth*iHeight, iWidth*iHeight);
+	memcpy(data, slowdata_bit + (f_cachebit_count*slow_rate + 150)*iWidth*iHeight, iWidth*iHeight);
 
 	resize(bit_img, bit_img, Size(pl_rect.Width(), pl_rect.Height()));
 	flip(bit_img, bit_img, 0);
@@ -1375,36 +1272,33 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 	A.pOutBuffer = pOutBuffer;
 	A.uDataSize = uDataSize;
 
-	if (!bOrgImg)
-	{
-		Display_image_from_camera(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
-		
-	}
-	else
-	{
-		SetEvent(m_Event);
-		if (!m_rawproc) {
-			m_rawproc = TRUE;
 
-			m_hThread_self = (HANDLE)_beginthreadex(NULL, 0, &show_self, this, 0, 0);
+	SetEvent(m_Event);
+	if (!m_rawproc) {
+		m_rawproc = TRUE;
+
+		m_hThread_self = (HANDLE)_beginthreadex(NULL, 0, &show_self, this, 0, 0);
+	}
+
+	if (!m_bitproc) {
+		m_bitproc = TRUE;
+
+
+		m_hThread_slow = (HANDLE)_beginthreadex(NULL, 0, &slow_Thread1, this, 0, 0);
+
+	}
+
+	if (m_Save_Package) {
+		if (m_hThread_save == INVALID_HANDLE_VALUE) {
+			m_hThread_save = (HANDLE)_beginthreadex(NULL, 0, &save_Thread, this, 0, 0);
+
 		}
-		//Display_image_byself(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
+	}
+	else {
+		m_hThread_save = INVALID_HANDLE_VALUE;
+	}
+
 	
-		// 离散脉冲展示和慢速展示
-		
-		if (!m_bitproc) {
-			m_bitproc = TRUE;
-			
-			
-			m_hThread_slow = (HANDLE)_beginthreadex(NULL, 0, &slow_Thread1, this, 0, 0);
-
-		//	if (f_cachebit_count)
-			//	Display_slow(iWidth, iHeight);
-			//Display_slow_data(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
-		}
-		
-			
-	}
 }
 
 
@@ -1449,14 +1343,21 @@ LRESULT CMFCApplication1Dlg::OnMsg(WPARAM wP, LPARAM lP)
 
 void CMFCApplication1Dlg::Found_Cam()
 {
-	m_strIniFile = ".\\40kfps.ini";
-	enum_dev();
-	open_dev();
+	if (m_bRunning) {
+		MessageBox("相机已经在运行！！！！");
+	} 
+	else
+	{
+		enum_dev();
+		open_dev();
+		start_dev();
+	}
 	
-	start_dev();
 	
 	if (!m_bRunning) {
+		OnBnClickedCam();
 		msg("Can't Found the Camera!");
+		
 	}
 	
 	// TODO: 在此添加控件通知处理程序代码
@@ -1469,10 +1370,23 @@ void CMFCApplication1Dlg::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == 0)
 	{
 		CString str;
+		CString str_raw;
+		CString str_slow;
+
 		str.Format("FrameCount: %u, Rate: %.3ffps\r\nImageSize(BYTES): %u\r\n",
 			m_uFrameCnt, m_fFrameRate, m_uImageBytes);
-		
+
+		str_raw.Format("前 %d 秒的原始脉冲图像放慢 %d 倍显示\n", 
+			 f_cachebit_count/ 2, (int) m_fFrameRate * 400 / slow_rate);
+			
+		str_slow.Format("前 %d 秒脉冲间隔恢复图像放慢 %d 倍显示\n",
+			 f_cachebit_count / 2, (int) m_fFrameRate * 400 / slow_rate);
+
 		m_fps.SetWindowText(str);
+		m_rawdata.SetWindowText(str_raw);
+		m_slowimg.SetWindowText(str_slow);
+
+
 		f_cachebit_count++;
 		if (f_cachebit_count % 10 == 0) {
 			f_cachebit = TRUE;
@@ -1491,30 +1405,410 @@ void CMFCApplication1Dlg::OnTimer(UINT_PTR nIDEvent)
 
 void CMFCApplication1Dlg::OnBnClickedCam()
 {
-	m_bSave = FALSE;
-	m_bRunning = FALSE;
-	
-
-
-	WaitForSingleObject(m_hThread, INFINITE);
-	m_rawproc = FALSE;
-	m_bitproc = FALSE;
-	WaitForSingleObject(m_hThread_slow, INFINITE);
-	WaitForSingleObject(m_hThread_self, INFINITE);
-
-	m_hThread = INVALID_HANDLE_VALUE;
-	m_hThread_slow = INVALID_HANDLE_VALUE;
-	m_hThread_self = INVALID_HANDLE_VALUE;
-
-	int iRet = CloseDevice(m_nDevID);
-	if (iRet == DT_ERROR_OK)
-	{
-		msg("CloseDevice OK\n");
-		m_bOpen = FALSE;
-		
+	if (!m_bRunning) {
+		MessageBox("相机未在工作，无需关闭");
 	}
-	else
+	else {
+		m_bSave = FALSE;
+		m_bRunning = FALSE;
+
+		WaitForSingleObject(m_hThread, INFINITE);
+		m_rawproc = FALSE;
+		m_bitproc = FALSE;
+		WaitForSingleObject(m_hThread_slow, INFINITE);
+		WaitForSingleObject(m_hThread_self, INFINITE);
+
+		m_hThread = INVALID_HANDLE_VALUE;
+		m_hThread_slow = INVALID_HANDLE_VALUE;
+		m_hThread_self = INVALID_HANDLE_VALUE;
+
+		int iRet = CloseDevice(m_nDevID);
+		if (iRet == DT_ERROR_OK)
+		{
+			msg("CloseDevice OK\n");
+			m_bOpen = FALSE;
+
+		}
+		else
+		{
+			msg("CloseDevice failed with err:%d\n", iRet);
+		}
+	}
+	
+}
+
+
+void CMFCApplication1Dlg::SetSaveTime()
+{
+	
+	UpdateData(TRUE);
+
+	int savems = ((int)m_fSavetime) - (((int)m_fSavetime) % 20);
+	m_package_count = savems / 20 + 1;
+	msg("Setting %d ms data\n", savems);
+
+	m_Save_Package = TRUE;
+	// TODO: 在此添加控件通知处理程序代码
+}
+
+
+void getFiles(string path, vector<string>& files)
+{
+	//文件句柄  
+	long   hFile = 0;
+	//文件信息  
+	struct _finddata_t fileinfo;
+	string p;
+	if ((hFile = _findfirst(p.assign(path).append("\\*").c_str(), &fileinfo)) != -1)
 	{
-		msg("CloseDevice failed with err:%d\n", iRet);
+		do
+		{
+			//如果是目录,迭代之  
+			//如果不是,加入列表  
+			if ((fileinfo.attrib &  _A_SUBDIR))
+			{
+				if (strcmp(fileinfo.name, ".") != 0 && strcmp(fileinfo.name, "..") != 0)
+					getFiles(p.assign(path).append("\\").append(fileinfo.name), files);
+			}
+			else
+			{
+				files.push_back(p.assign(path).append("\\").append(fileinfo.name));
+			}
+		} while (_findnext(hFile, &fileinfo) == 0);
+		_findclose(hFile);
 	}
 }
+
+
+
+void CMFCApplication1Dlg::load_and_proc()
+{
+
+
+	int height = 250;
+	int width = 400;
+	Mat img(Size(400, 250), CV_8UC1);
+	Mat img_bit(Size(400, 250), CV_8UC1);
+
+	Mat img_color(Size(400, 250), CV_8UC3);
+	Mat img_bit_color(Size(400, 250), CV_8UC3);
+
+	uchar *gray = img.data;
+	uchar *bit_img = img_bit.data;
+
+
+	VideoWriter writer;
+	VideoWriter writer_bit;
+	int codec = CV_FOURCC('M', 'J', 'P', 'G');
+	
+	double fps = 50.0;                          // framerate of the created video stream
+	string video_filename = "./slow_show.avi";             // name of the output video file
+	string video_filename_bit = "./slow_show_bit.avi";     // name of the output video file
+	
+	writer.open(video_filename, codec, fps, img.size(), 1);
+	
+	if (!writer.isOpened()) {
+		MessageBox("Can't open the video files to write");
+
+	}
+
+//	writer_bit.open(video_filename_bit, codec, fps, img_bit.size(), 1);
+	
+//	if (!writer_bit.isOpened()) {
+//		MessageBox("Can't open the bit video files to write");
+
+//	}
+
+	msg("The value of codecc is %d\n", codec);
+
+	vector<string> files;
+
+	char * filePath = ".//temdata";
+	char * distAll = "AllFiles.txt";
+	getFiles(filePath, files);
+	ofstream ofn(distAll);
+	int size = files.size();
+	msg("The size of files is %d\n", size);
+	ofn << size << endl;
+	for (int i = 0; i<size; i++)
+	{
+		ofn << files[i] << endl;
+	}
+	ofn.close();
+
+	long length;//文件字节数
+	ifstream file(".//temdata//0.dat", ios::in | ios::binary);
+	file.seekg(0, ios::end);
+	length = file.tellg();
+	file.seekg(0, ios::beg);
+
+	uchar* pulse = new uchar[length + 250 * 400 / 8];//length为像素个数/8
+	uchar* pulse_in = new uchar[length];
+	uint* interval = new uint[250 * 400];
+	uint* label = new uint[250 * 400];
+	uint* gray_first = new uint[250 * 400];
+
+	//uchar* gray = new uchar[250 * 400];
+	uchar q1 = 1;
+	uchar q2 = 2;
+	uchar q3 = 4;
+	uchar q4 = 8;
+	uchar q5 = 16;
+	uchar q6 = 32;
+	uchar q7 = 64;
+	uchar q8 = 128;
+	for (int ii = 0; ii < 250 * 400 / 8; ii++)
+	{
+		pulse[ii] = 0xFF;
+	}
+	for (int jj = 0; jj < 250 * 40 / 8; jj++)
+	{
+		label[jj] = 0x00;
+	}
+	file.read((char*)pulse_in, length);
+	file.close();
+	for (int mm = 0; mm < length; mm++)
+	{
+		pulse[mm + 250 * 400 / 8] = pulse_in[mm];
+	}
+	uint itemp = 0;
+	uint iframe = 0;
+	uint frame;
+	uint framecount;
+	uint irow = 0;
+	uint itime = 0;
+	CString filename;
+
+	
+
+	for (iframe = 0; iframe * 50 * 250 < length + 50 * 250; iframe++)
+	{
+		
+		if (iframe == 1)
+			MessageBox("in loop 1");
+		frame = iframe;
+		
+
+		memset(bit_img, 0x0, width*height);
+		for (irow = 0; irow < 250; irow++)
+		{
+			for (itime = 0; itime < 50; itime++)//每行52个字节
+			{
+
+				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q1)
+				{
+					interval[8 * 50 * irow + 8 * itime] = frame - label[8 * 50 * irow + 8 * itime];
+					label[8 * 50 * irow + 8 * itime] = frame;
+					bit_img[8 * 50 * irow + 8 * itime] = 0xff;
+				}
+				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q2)
+				{
+					interval[8 * 50 * irow + 8 * itime + 1] = frame - label[8 * 50 * irow + 8 * itime + 1];
+					label[8 * 50 * irow + 8 * itime + 1] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 1] = 0xff;
+				}
+				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q3)
+				{
+					interval[8 * 50 * irow + 8 * itime + 2] = frame - label[8 * 50 * irow + 8 * itime + 2];
+					label[8 * 50 * irow + 8 * itime + 2] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 2] = 0xff;
+				}
+				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q4)
+				{
+					interval[8 * 50 * irow + 8 * itime + 3] = frame - label[8 * 50 * irow + 8 * itime + 3];
+					label[8 * 50 * irow + 8 * itime + 3] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 3] = 0xff;
+				}
+				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q5)
+				{
+					interval[8 * 50 * irow + 8 * itime + 4] = frame - label[8 * 50 * irow + 8 * itime + 4];
+					label[8 * 50 * irow + 8 * itime + 4] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 4] = 0xff;
+				}
+				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q6)
+				{
+					interval[8 * 50 * irow + 8 * itime + 5] = frame - label[8 * 50 * irow + 8 * itime + 5];
+					label[8 * 50 * irow + 8 * itime + 5] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 5] = 0xff;
+				}
+				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q7)
+				{
+					interval[8 * 50 * irow + 8 * itime + 6] = frame - label[8 * 50 * irow + 8 * itime + 6];
+					label[8 * 50 * irow + 8 * itime + 6] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 6] = 0xff;
+				}
+				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q8)
+				{
+					interval[8 * 50 * irow + 8 * itime + 7] = frame - label[8 * 50 * irow + 8 * itime + 7];
+					label[8 * 50 * irow + 8 * itime + 7] = frame;
+					bit_img[8 * 50 * irow + 8 * itime + 7] = 0xff;
+
+				}
+			}
+		}
+		for (int mm = 0; mm < 250 * 400; mm++)
+		{
+			if (interval[mm] != 0)
+			{
+				gray_first[mm] = (1600 / interval[mm]> 255) ? 255 : ((1600 / interval[mm]) & 0xff);;
+				gray[mm] = gray_first[mm];
+			}
+			if (interval[mm] == 0)
+			{
+				gray[mm] = 0;
+			}
+		}
+		//video
+		flip(img, img, 0);
+		flip(img_bit, img_bit, 0);
+		cvtColor(img, img_color, COLOR_GRAY2BGR);
+		cvtColor(img_bit, img_bit_color, COLOR_GRAY2BGR);
+		writer.write(img_color);
+
+		//writer_bit.write(img_bit_color);
+	
+	}
+	framecount = iframe;
+	for (int isize = 1; isize < size; isize++)
+	{
+		filename.Format(".//temdata//%d.dat", isize);
+		ifstream file(filename, ios::in | ios::binary);
+		file.seekg(0, ios::end);
+		length = file.tellg();
+		file.seekg(0, ios::beg);
+		file.read((char*)pulse, length);
+		file.close();
+		for (iframe = framecount; (iframe - framecount) * 50 * 250 < length; iframe++)
+		{
+			
+
+			memset(bit_img, 0x0, width*height);
+			frame = iframe - framecount;
+			for (irow = 0; irow < 250; irow++)
+			{
+				for (itime = 0; itime < 50; itime++)//每行52个字节
+				{
+
+					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q1)
+					{
+						interval[8 * 50 * irow + 8 * itime] = frame - label[8 * 50 * irow + 8 * itime];
+						label[8 * 50 * irow + 8 * itime] = frame;
+						bit_img[8 * 50 * irow + 8 * itime] = 0xff;
+					}
+					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q2)
+					{
+						interval[8 * 50 * irow + 8 * itime + 1] = frame - label[8 * 50 * irow + 8 * itime + 1];
+						label[8 * 50 * irow + 8 * itime + 1] = frame;
+						bit_img[8 * 50 * irow + 8 * itime + 1] = 0xff;
+					}
+					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q3)
+					{
+						interval[8 * 50 * irow + 8 * itime + 2] = frame - label[8 * 50 * irow + 8 * itime + 2];
+						label[8 * 50 * irow + 8 * itime + 2] = frame;
+						bit_img[8 * 50 * irow + 8 * itime + 2] = 0xff;
+					}
+					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q4)
+					{
+						interval[8 * 50 * irow + 8 * itime + 3] = frame - label[8 * 50 * irow + 8 * itime + 3];
+						label[8 * 50 * irow + 8 * itime + 3] = frame;
+						bit_img[8 * 50 * irow + 8 * itime + 3] = 0xff;
+					}
+					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q5)
+					{
+						interval[8 * 50 * irow + 8 * itime + 4] = frame - label[8 * 50 * irow + 8 * itime + 4];
+						label[8 * 50 * irow + 8 * itime + 4] = frame;
+						bit_img[8 * 50 * irow + 8 * itime + 4] = 0xff;
+					}
+					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q6)
+					{
+						interval[8 * 50 * irow + 8 * itime + 5] = frame - label[8 * 50 * irow + 8 * itime + 5];
+						label[8 * 50 * irow + 8 * itime + 5] = frame;
+						bit_img[8 * 50 * irow + 8 * itime + 5] = 0xff;
+					}
+					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q7)
+					{
+						interval[8 * 50 * irow + 8 * itime + 6] = frame - label[8 * 50 * irow + 8 * itime + 6];
+						label[8 * 50 * irow + 8 * itime + 6] = frame;
+						bit_img[8 * 50 * irow + 8 * itime + 6] = 0xff;
+					}
+					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q8)
+					{
+						interval[8 * 50 * irow + 8 * itime + 7] = frame - label[8 * 50 * irow + 8 * itime + 7];
+						label[8 * 50 * irow + 8 * itime + 7] = frame;
+						bit_img[8 * 50 * irow + 8 * itime + 7] = 0xff;
+
+					}
+				}
+			}
+			for (int mm = 0; mm < 250 * 400; mm++)
+			{
+				if (interval[mm] != 0)
+				{
+					gray_first[mm] = (1600 / interval[mm] > 255) ? 255 : ((1600 / interval[mm]) & 0xff);;
+					gray[mm] = gray_first[mm];
+				}
+				if (interval[mm] == 0)
+				{
+					gray[mm] = 0;
+				}
+			}
+			// video
+		//	if (iframe == 500) {
+		//		imwrite("tmp.jpg", img);
+		//	imwrite("tmp_bit.jpg", img_bit);
+		//	}
+
+			flip(img, img, 0);
+			flip(img_bit, img_bit, 0);
+			cvtColor(img, img_color, COLOR_GRAY2BGR);
+			cvtColor(img_bit, img_bit_color, COLOR_GRAY2BGR);
+			writer.write(img_color);
+
+			//writer_bit.write(img_bit_color);
+			/*
+			flip(img, img, 0);
+			flip(img_bit, img_bit, 0);
+			cvtColor(img, img_color, COLOR_GRAY2BGR);
+			cvtColor(img_bit, img_bit_color, COLOR_GRAY2BGR);
+			writer.write(img_color);
+
+			writer_bit.write(img_bit_color);
+			*/
+		}
+		framecount = iframe;
+	}
+
+
+	//writer.release();
+	//writer_bit.release();
+
+
+	msg("数据处理完成，请选择FPS显示\n");
+
+	MessageBox("数据处理完成，请选择FPS显示\n");
+
+	delete[] pulse;
+	delete[] interval;
+	delete[] label;
+	delete[] gray_first;
+
+
+}
+
+
+
+void CMFCApplication1Dlg::raw2video()
+{
+	if (m_raw2video) {
+		MessageBox("The offline thread is running");
+	}
+	else {
+		if (m_hThread_raw2video == INVALID_HANDLE_VALUE)
+			m_hThread_raw2video = (HANDLE)_beginthreadex(NULL, 0, &offline_data_proc, this, 0, 0);
+
+	}
+
+
+	// TODO: 在此添加控件通知处理程序代码
+}
+
