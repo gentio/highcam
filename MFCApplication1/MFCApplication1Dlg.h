@@ -78,6 +78,10 @@ protected:
 	BOOL    m_rawproc = FALSE;
 	BOOL    m_bitproc = FALSE;
 	BOOL    m_raw2video = FALSE;
+	BOOL    f_save_slow_video = TRUE;
+	BOOL    f_save_slow_video_bit = FALSE;
+	BOOL    f_save_slow_img = FALSE;
+	BOOL    f_save_slow_img_bit = FALSE;
 
 	HANDLE  m_hThread;
 	HANDLE  m_hThread_slow; // 自己的脉冲窗口展示线程 记录
@@ -90,7 +94,7 @@ protected:
 	HANDLE  m_Event;
 	HANDLE  m_rawEvent;
 	
-	int cache_count; // 缓冲区计数
+	
 
 
 	UINT    m_uFrameCnt;

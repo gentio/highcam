@@ -52,7 +52,7 @@ int slow_rate = 10;
 
 BYTE *slowdata = new BYTE[FRAME_CUSUM_CNT * 250 * 400];
 BYTE *slowdata_bit = new BYTE[FRAME_CUSUM_CNT * 250 * 400];
-BYTE *raw_data = new BYTE[FRAME_CUSUM_CNT * 250 * 80 * 5]; // 分配五个原始数据包的缓冲区
+BYTE *raw_data = new BYTE[FRAME_CUSUM_CNT * 250 * 80 ]; // 分配原始数据包的缓冲区
 BYTE *save_data_buffer = new BYTE[FRAME_CUSUM_CNT * 250 * 80];
 
 UINT __stdcall RemoteDebugThread(LPVOID param)
@@ -348,7 +348,6 @@ CMFCApplication1Dlg::CMFCApplication1Dlg(CWnd* pParent /*=NULL*/)
 	, m_bOriginalImage(TRUE)
 	, m_Video(FALSE)
 	, m_bSave(FALSE)
-	, cache_count(0)
 	, m_Save_Package(FALSE)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
@@ -373,6 +372,11 @@ void CMFCApplication1Dlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, SLOWIMG, m_slowimg);
 
 	DDX_Text(pDX, SAVEMS, m_fSavetime);
+
+	DDX_Check(pDX, save_slow_video, f_save_slow_video);
+	DDX_Check(pDX, save_slow_video_bit, f_save_slow_video_bit);
+	DDX_Check(pDX, save_slow_img, f_save_slow_img);
+	DDX_Check(pDX, save_slow_img_bit, f_save_slow_img_bit);
 }
 
 BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
@@ -821,13 +825,10 @@ void CMFCApplication1Dlg::WorkProc()
 				m_uImageBytes = uDataSize;
 			}
 			WaitForSingleObject(m_Mutex, INFINITE);
-			memcpy(raw_data + cache_count*FRAME_CUSUM_CNT * 250 * 50, pBuffer, FRAME_CUSUM_CNT * 250 * 50);
-			++cache_count;
-			if (cache_count == 5)
-				cache_count = 0;
+			memcpy(raw_data , pBuffer, FRAME_CUSUM_CNT * 250 * 50);
 			ReleaseMutex(m_Mutex);
 
-			// 是否保存缓存包
+			// 是否保原始数据
 			if (m_package_count > 0) {
 				WaitForSingleObject(m_rawMutex, INFINITE);
 				memcpy(save_data_buffer, pBuffer, FRAME_CUSUM_CNT * 250 * 50);
@@ -1043,10 +1044,8 @@ void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, B
 		WaitForSingleObject(m_Event, INFINITE);
 
 		WaitForSingleObject(m_Mutex, INFINITE);
-		if (cache_count)
-			memcpy(pulse, raw_data + (cache_count-1)*FRAME_CUSUM_CNT * 50 * 250, FRAME_CUSUM_CNT * 50 * 250);
-		else
-			memcpy(pulse, raw_data + 4 * FRAME_CUSUM_CNT * 50 * 250,  FRAME_CUSUM_CNT * 250 * 50);
+		
+		memcpy(pulse, raw_data,  FRAME_CUSUM_CNT * 250 * 50);
 
 		ReleaseMutex(m_Mutex);
 
@@ -1483,15 +1482,18 @@ void getFiles(string path, vector<string>& files)
 
 void CMFCApplication1Dlg::load_and_proc()
 {
-
+	UpdateData(TRUE);
+	// 保存记录变量，以免中途点击影响到
+	BOOL F_video = f_save_slow_video;
+	BOOL F_video_bit = f_save_slow_video_bit;
+	BOOL F_img = f_save_slow_img;
+	BOOL F_img_bit = f_save_slow_img_bit;
 
 	int height = 250;
 	int width = 400;
 	Mat img(Size(400, 250), CV_8UC1);
 	Mat img_bit(Size(400, 250), CV_8UC1);
 
-	Mat img_color(Size(400, 250), CV_8UC3);
-	Mat img_bit_color(Size(400, 250), CV_8UC3);
 
 	uchar *gray = img.data;
 	uchar *bit_img = img_bit.data;
@@ -1499,27 +1501,26 @@ void CMFCApplication1Dlg::load_and_proc()
 
 	VideoWriter writer;
 	VideoWriter writer_bit;
-	int codec = CV_FOURCC('M', 'J', 'P', 'G');
+	int codec = CV_FOURCC('F', 'L', 'V', '1');
 	
 	double fps = 50.0;                          // framerate of the created video stream
 	string video_filename = "./slow_show.avi";             // name of the output video file
 	string video_filename_bit = "./slow_show_bit.avi";     // name of the output video file
 	
-	writer.open(video_filename, codec, fps, img.size(), 1);
+	writer.open(video_filename, codec, fps, img.size(), 0);
 	
 	if (!writer.isOpened()) {
 		MessageBox("Can't open the video files to write");
 
 	}
 
-//	writer_bit.open(video_filename_bit, codec, fps, img_bit.size(), 1);
+	writer_bit.open(video_filename_bit, codec, fps, img_bit.size(), 0);
 	
-//	if (!writer_bit.isOpened()) {
-//		MessageBox("Can't open the bit video files to write");
+	if (!writer_bit.isOpened()) {
+		MessageBox("Can't open the bit video files to write");
+	}
 
-//	}
-
-	msg("The value of codecc is %d\n", codec);
+	//msg("The value of codecc is %d\n", codec);
 
 	vector<string> files;
 
@@ -1527,10 +1528,12 @@ void CMFCApplication1Dlg::load_and_proc()
 	char * distAll = "AllFiles.txt";
 	getFiles(filePath, files);
 	ofstream ofn(distAll);
-	int size = files.size();
-	msg("The size of files is %d\n", size);
-	ofn << size << endl;
-	for (int i = 0; i<size; i++)
+	int file_count = files.size();
+	msg("Files to proc: %d\n", file_count);
+	
+
+	ofn << file_count << endl;
+	for (int i = 0; i<file_count; i++)
 	{
 		ofn << files[i] << endl;
 	}
@@ -1542,7 +1545,7 @@ void CMFCApplication1Dlg::load_and_proc()
 	length = file.tellg();
 	file.seekg(0, ios::beg);
 
-	uchar* pulse = new uchar[length + 250 * 400 / 8];//length为像素个数/8
+	uchar* pulse = new uchar[length];//length为像素个数/8
 	uchar* pulse_in = new uchar[length];
 	uint* interval = new uint[250 * 400];
 	uint* label = new uint[250 * 400];
@@ -1557,20 +1560,19 @@ void CMFCApplication1Dlg::load_and_proc()
 	uchar q6 = 32;
 	uchar q7 = 64;
 	uchar q8 = 128;
-	for (int ii = 0; ii < 250 * 400 / 8; ii++)
-	{
-		pulse[ii] = 0xFF;
-	}
-	for (int jj = 0; jj < 250 * 40 / 8; jj++)
+	
+	for (int jj = 0; jj < 250 * 400; jj++)
 	{
 		label[jj] = 0x00;
 	}
-	file.read((char*)pulse_in, length);
+	file.read((char*)pulse, length);
 	file.close();
+	/*
 	for (int mm = 0; mm < length; mm++)
 	{
 		pulse[mm + 250 * 400 / 8] = pulse_in[mm];
 	}
+	*/
 	uint itemp = 0;
 	uint iframe = 0;
 	uint frame;
@@ -1579,97 +1581,11 @@ void CMFCApplication1Dlg::load_and_proc()
 	uint itime = 0;
 	CString filename;
 
-	
+	framecount = 0;
+	char tmp[500];
 
-	for (iframe = 0; iframe * 50 * 250 < length + 50 * 250; iframe++)
-	{
-		
-		if (iframe == 1)
-			MessageBox("in loop 1");
-		frame = iframe;
-		
 
-		memset(bit_img, 0x0, width*height);
-		for (irow = 0; irow < 250; irow++)
-		{
-			for (itime = 0; itime < 50; itime++)//每行52个字节
-			{
-
-				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q1)
-				{
-					interval[8 * 50 * irow + 8 * itime] = frame - label[8 * 50 * irow + 8 * itime];
-					label[8 * 50 * irow + 8 * itime] = frame;
-					bit_img[8 * 50 * irow + 8 * itime] = 0xff;
-				}
-				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q2)
-				{
-					interval[8 * 50 * irow + 8 * itime + 1] = frame - label[8 * 50 * irow + 8 * itime + 1];
-					label[8 * 50 * irow + 8 * itime + 1] = frame;
-					bit_img[8 * 50 * irow + 8 * itime + 1] = 0xff;
-				}
-				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q3)
-				{
-					interval[8 * 50 * irow + 8 * itime + 2] = frame - label[8 * 50 * irow + 8 * itime + 2];
-					label[8 * 50 * irow + 8 * itime + 2] = frame;
-					bit_img[8 * 50 * irow + 8 * itime + 2] = 0xff;
-				}
-				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q4)
-				{
-					interval[8 * 50 * irow + 8 * itime + 3] = frame - label[8 * 50 * irow + 8 * itime + 3];
-					label[8 * 50 * irow + 8 * itime + 3] = frame;
-					bit_img[8 * 50 * irow + 8 * itime + 3] = 0xff;
-				}
-				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q5)
-				{
-					interval[8 * 50 * irow + 8 * itime + 4] = frame - label[8 * 50 * irow + 8 * itime + 4];
-					label[8 * 50 * irow + 8 * itime + 4] = frame;
-					bit_img[8 * 50 * irow + 8 * itime + 4] = 0xff;
-				}
-				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q6)
-				{
-					interval[8 * 50 * irow + 8 * itime + 5] = frame - label[8 * 50 * irow + 8 * itime + 5];
-					label[8 * 50 * irow + 8 * itime + 5] = frame;
-					bit_img[8 * 50 * irow + 8 * itime + 5] = 0xff;
-				}
-				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q7)
-				{
-					interval[8 * 50 * irow + 8 * itime + 6] = frame - label[8 * 50 * irow + 8 * itime + 6];
-					label[8 * 50 * irow + 8 * itime + 6] = frame;
-					bit_img[8 * 50 * irow + 8 * itime + 6] = 0xff;
-				}
-				if (pulse[frame * 50 * 250 + irow * 50 + itime] & q8)
-				{
-					interval[8 * 50 * irow + 8 * itime + 7] = frame - label[8 * 50 * irow + 8 * itime + 7];
-					label[8 * 50 * irow + 8 * itime + 7] = frame;
-					bit_img[8 * 50 * irow + 8 * itime + 7] = 0xff;
-
-				}
-			}
-		}
-		for (int mm = 0; mm < 250 * 400; mm++)
-		{
-			if (interval[mm] != 0)
-			{
-				gray_first[mm] = (1600 / interval[mm]> 255) ? 255 : ((1600 / interval[mm]) & 0xff);;
-				gray[mm] = gray_first[mm];
-			}
-			if (interval[mm] == 0)
-			{
-				gray[mm] = 0;
-			}
-		}
-		//video
-		flip(img, img, 0);
-		flip(img_bit, img_bit, 0);
-		cvtColor(img, img_color, COLOR_GRAY2BGR);
-		cvtColor(img_bit, img_bit_color, COLOR_GRAY2BGR);
-		writer.write(img_color);
-
-		//writer_bit.write(img_bit_color);
-	
-	}
-	framecount = iframe;
-	for (int isize = 1; isize < size; isize++)
+	for (int isize = 0; isize < file_count; isize++)
 	{
 		filename.Format(".//temdata//%d.dat", isize);
 		ifstream file(filename, ios::in | ios::binary);
@@ -1678,60 +1594,65 @@ void CMFCApplication1Dlg::load_and_proc()
 		file.seekg(0, ios::beg);
 		file.read((char*)pulse, length);
 		file.close();
-		for (iframe = framecount; (iframe - framecount) * 50 * 250 < length; iframe++)
+
+		sprintf(tmp, "Processing %d\\%d \n", isize ,file_count);
+		msg(tmp);
+
+		for (iframe  = 0; iframe< FRAME_CUSUM_CNT; iframe++)
 		{
-			
+			framecount++;
 
 			memset(bit_img, 0x0, width*height);
-			frame = iframe - framecount;
+			frame = isize * FRAME_CUSUM_CNT + iframe;
+
 			for (irow = 0; irow < 250; irow++)
 			{
 				for (itime = 0; itime < 50; itime++)//每行52个字节
 				{
 
-					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q1)
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q1)
 					{
 						interval[8 * 50 * irow + 8 * itime] = frame - label[8 * 50 * irow + 8 * itime];
 						label[8 * 50 * irow + 8 * itime] = frame;
 						bit_img[8 * 50 * irow + 8 * itime] = 0xff;
 					}
-					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q2)
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q2)
 					{
 						interval[8 * 50 * irow + 8 * itime + 1] = frame - label[8 * 50 * irow + 8 * itime + 1];
 						label[8 * 50 * irow + 8 * itime + 1] = frame;
 						bit_img[8 * 50 * irow + 8 * itime + 1] = 0xff;
 					}
-					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q3)
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q3)
 					{
 						interval[8 * 50 * irow + 8 * itime + 2] = frame - label[8 * 50 * irow + 8 * itime + 2];
 						label[8 * 50 * irow + 8 * itime + 2] = frame;
 						bit_img[8 * 50 * irow + 8 * itime + 2] = 0xff;
 					}
-					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q4)
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q4)
 					{
 						interval[8 * 50 * irow + 8 * itime + 3] = frame - label[8 * 50 * irow + 8 * itime + 3];
 						label[8 * 50 * irow + 8 * itime + 3] = frame;
 						bit_img[8 * 50 * irow + 8 * itime + 3] = 0xff;
 					}
-					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q5)
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q5)
 					{
 						interval[8 * 50 * irow + 8 * itime + 4] = frame - label[8 * 50 * irow + 8 * itime + 4];
 						label[8 * 50 * irow + 8 * itime + 4] = frame;
 						bit_img[8 * 50 * irow + 8 * itime + 4] = 0xff;
 					}
-					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q6)
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q6)
 					{
 						interval[8 * 50 * irow + 8 * itime + 5] = frame - label[8 * 50 * irow + 8 * itime + 5];
 						label[8 * 50 * irow + 8 * itime + 5] = frame;
 						bit_img[8 * 50 * irow + 8 * itime + 5] = 0xff;
 					}
-					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q7)
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q7)
 					{
 						interval[8 * 50 * irow + 8 * itime + 6] = frame - label[8 * 50 * irow + 8 * itime + 6];
 						label[8 * 50 * irow + 8 * itime + 6] = frame;
 						bit_img[8 * 50 * irow + 8 * itime + 6] = 0xff;
 					}
-					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q8)
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q8)
 					{
 						interval[8 * 50 * irow + 8 * itime + 7] = frame - label[8 * 50 * irow + 8 * itime + 7];
 						label[8 * 50 * irow + 8 * itime + 7] = frame;
@@ -1740,59 +1661,55 @@ void CMFCApplication1Dlg::load_and_proc()
 					}
 				}
 			}
+			
 			for (int mm = 0; mm < 250 * 400; mm++)
 			{
 				if (interval[mm] != 0)
 				{
-					gray_first[mm] = (1600 / interval[mm] > 255) ? 255 : ((1600 / interval[mm]) & 0xff);;
-					gray[mm] = gray_first[mm];
+					gray[mm] = (1600 / interval[mm]> 255) ? 255 : ((1600 / interval[mm]) & 0xff);
+
+					//gray_first[mm] = (1600 / interval[mm]> 255) ? 255 : ((1600 / interval[mm]) & 0xff);;
+					//gray[mm] = gray_first[mm];
 				}
 				if (interval[mm] == 0)
 				{
 					gray[mm] = 0;
 				}
 			}
-			// video
-		//	if (iframe == 500) {
-		//		imwrite("tmp.jpg", img);
-		//	imwrite("tmp_bit.jpg", img_bit);
-		//	}
-
+		
 			flip(img, img, 0);
 			flip(img_bit, img_bit, 0);
-			cvtColor(img, img_color, COLOR_GRAY2BGR);
-			cvtColor(img_bit, img_bit_color, COLOR_GRAY2BGR);
-			writer.write(img_color);
-
-			//writer_bit.write(img_bit_color);
-			/*
-			flip(img, img, 0);
-			flip(img_bit, img_bit, 0);
-			cvtColor(img, img_color, COLOR_GRAY2BGR);
-			cvtColor(img_bit, img_bit_color, COLOR_GRAY2BGR);
-			writer.write(img_color);
-
-			writer_bit.write(img_bit_color);
-			*/
+			
+			if (F_video) {
+				writer.write(img);
+			}
+			if (F_video_bit) {
+				writer_bit.write(img_bit);
+			}
+			
+			if (F_img) {
+				sprintf(tmp, "./pic/%d.jpg", framecount);
+				imwrite(tmp, img);
+			}
+			if (F_img_bit) {
+				sprintf(tmp, "./bit/%d.jpg", framecount);
+				imwrite(tmp, img_bit);
+			}
+			
+			
+		
 		}
-		framecount = iframe;
+		
 	}
-
-
-	//writer.release();
-	//writer_bit.release();
-
-
-	msg("数据处理完成，请选择FPS显示\n");
-
-	MessageBox("数据处理完成，请选择FPS显示\n");
+	
+	MessageBox("数据处理完成\n");
 
 	delete[] pulse;
 	delete[] interval;
 	delete[] label;
 	delete[] gray_first;
 
-
+	m_raw2video = FALSE;
 }
 
 
@@ -1803,7 +1720,8 @@ void CMFCApplication1Dlg::raw2video()
 		MessageBox("The offline thread is running");
 	}
 	else {
-		if (m_hThread_raw2video == INVALID_HANDLE_VALUE)
+		m_raw2video = TRUE;
+		//if (m_hThread_raw2video == INVALID_HANDLE_VALUE)
 			m_hThread_raw2video = (HANDLE)_beginthreadex(NULL, 0, &offline_data_proc, this, 0, 0);
 
 	}
