@@ -1,8 +1,11 @@
-
+#pragma once
 // MFCApplication1Dlg.h : 头文件
 //
 
-#pragma once
+#ifndef CAM_H
+#define CAM_H
+
+
 
 #include "DTCCM2_SDK\dtccm2.h"
 
@@ -142,4 +145,18 @@ private:
 	BYTE *raw_data = NULL; // 分配原始数据包的缓冲区
 	BYTE *save_data_buffer = NULL;
 
+
 };
+
+class cparamlist {
+public:
+	CMFCApplication1Dlg *windows;
+	BYTE *pInData;
+	ULONG uDataSize;
+	BYTE *pOutBuffer;
+	int iWidth;
+	int iHeight;
+};
+
+
+#endif
