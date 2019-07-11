@@ -16,17 +16,16 @@ class CMFCApplication1Dlg : public CDialogEx
 // 构造
 public:
 	CMFCApplication1Dlg(CWnd* pParent = NULL);	// 标准构造函数
-	// 离散脉冲慢速展示的判断
+	~CMFCApplication1Dlg();
+												// 离散脉冲慢速展示的判断
 	int f_cachebit_count;
-	BOOL f_cachebit;
-	//BYTE slowdata[400 * 250 * FRAME_CUSUM_CNT];
-	//BYTE slowdata_bit[400 * 250 * FRAME_CUSUM_CNT];
-
+	BOOL f_cachebit = FALSE;
+	
+	// 枚举设备 打开设备，采集数据
 	int enum_dev();
 	int open_dev();
 	int start_dev();
-	void DrawImage(BYTE *pRgb, int iWidth, int iHeight);
-	void DrawImage_slow(BYTE *pRgb, int iWidth, int iHeight);
+	
 	void Display_image_from_camera(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight);
 	void Display_image_byself(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight);
 	void Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight);
@@ -67,17 +66,21 @@ protected:
 	float m_fVpp;
 	float m_fMclk;
 
-	float m_fSavetime;
+	float m_fSavetime;  //  保存毫秒数
 
 	int   m_package_count; // 要保存的包计数
 	BOOL  m_Save_Package;   // 控制保存raw的标志变量
 
 	BOOL    m_bOpen;
 	int     m_nDevID;
+
+	// 四个判断线程是否运行的标志变量
 	BOOL    m_bRunning;
 	BOOL    m_rawproc = FALSE;
 	BOOL    m_bitproc = FALSE;
 	BOOL    m_raw2video = FALSE;
+
+	// 四个保存离线处理数据的标志变量
 	BOOL    f_save_slow_video = TRUE;
 	BOOL    f_save_slow_video_bit = FALSE;
 	BOOL    f_save_slow_img = FALSE;
@@ -89,13 +92,11 @@ protected:
 	HANDLE  m_hThread_save; // 保存线程的状态记录
 	HANDLE  m_hThread_raw2video = INVALID_HANDLE_VALUE; //离线线程记录
 
-	HANDLE  m_Mutex;
+	HANDLE  m_Mutex;  // 读取数据线程与实时窗口展示线程的互斥量
 	HANDLE  m_rawMutex;
 	HANDLE  m_Event;
 	HANDLE  m_rawEvent;
 	
-	
-
 
 	UINT    m_uFrameCnt;
 	UINT    m_uImageBytes;
@@ -106,8 +107,8 @@ protected:
 	BOOL    m_bOriginalImage;
 
 	USHORT  m_uFrameCusum;
-	BOOL    m_bSave;
-	BOOL    m_Video;
+
+
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -132,4 +133,13 @@ public:
 	afx_msg void SetSaveTime();
 	
 	afx_msg void raw2video();
+private:
+	// 慢速窗口放慢的倍数
+	int slow_rate = 10;
+
+	BYTE *slowdata = NULL ;
+	BYTE *slowdata_bit = NULL;
+	BYTE *raw_data = NULL; // 分配原始数据包的缓冲区
+	BYTE *save_data_buffer = NULL;
+
 };
