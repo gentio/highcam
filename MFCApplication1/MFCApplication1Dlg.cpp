@@ -111,9 +111,12 @@ CMFCApplication1Dlg::CMFCApplication1Dlg(CWnd* pParent /*=NULL*/)
 	slowdata = new BYTE[FRAME_CUSUM_CNT * 250 * 400];
 	slowdata_bit = new BYTE[FRAME_CUSUM_CNT * 250 * 400];
 
-	raw_data = new BYTE[FRAME_CUSUM_CNT * 250 * 80]; // 分配原始数据包的缓冲区
+	raw_data = new BYTE[FRAME_CUSUM_CNT * 250 * 80]; // 用来进行实时处理的原始数据包的缓冲区
 	save_data_buffer = new BYTE[FRAME_CUSUM_CNT * 250 * 80];
 
+	temp_data_buffer = new BYTE[5*FRAME_CUSUM_CNT * 250 * 80]; //慢速展示数据的缓冲区
+	temp_disp_data_buffer = new BYTE[10*FRAME_CUSUM_CNT * 250 * 400];
+	temp_disp_bit_buffer = new BYTE[10 * FRAME_CUSUM_CNT * 250 * 400];
 }
 CMFCApplication1Dlg::~CMFCApplication1Dlg()
 {
@@ -146,6 +149,8 @@ CMFCApplication1Dlg::~CMFCApplication1Dlg()
 	delete[] slowdata_bit;
 	delete[] raw_data;
 	delete[] save_data_buffer;
+	delete[] temp_data_buffer;
+	delete[] temp_disp_data_buffer;
 }
 
 
@@ -258,8 +263,9 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	SetTimer(0, 500, NULL);
 	// 用于统计帧率
 	SetTimer(1, 4000, NULL);
+	// 用于统计慢速展示的缓存区拷贝
+	SetTimer(2, 5000, NULL);
 	// 用于判断是否进行离散脉冲慢速展示
-	
 	int ret;
 	memset(&m_frameInfo, 0x00, sizeof(m_frameInfo));
 	m_strIniFile = ".\\40kfps.ini";
@@ -413,18 +419,16 @@ void CMFCApplication1Dlg::OnTimer(UINT_PTR nIDEvent)
 		m_rawdata.SetWindowText(str_raw);
 		m_slowimg.SetWindowText(str_slow);
 
-
-		f_cachebit_count++;
-		if (f_cachebit_count % 10 == 0) {
-			f_cachebit = TRUE;
-			f_cachebit_count = 0;
-		}
-			
 	}
 	else if (nIDEvent == 1)
 	{
 		m_fFrameRate = (float)(m_uFrameCnt - m_uFrameCntLast) / 4;
 		m_uFrameCntLast = m_uFrameCnt;
+	}
+	else if (nIDEvent == 2)
+	{
+		m_temp_count = 5;
+		frame_offset = 0;
 	}
 	
 	CDialogEx::OnTimer(nIDEvent);
@@ -444,6 +448,12 @@ void CMFCApplication1Dlg::OnBnClickedCam()
 		m_bitproc = FALSE;
 		WaitForSingleObject(m_hThread_slow, INFINITE);
 		WaitForSingleObject(m_hThread_self, INFINITE);
+		
+		m_slow_proc = FALSE;
+		WaitForSingleObject(m_hThread_slow_data, INFINITE);
+		m_display_slow = FALSE;
+		WaitForSingleObject(m_hThread_slow, INFINITE);
+		
 
 		m_hThread = INVALID_HANDLE_VALUE;
 		m_hThread_slow = INVALID_HANDLE_VALUE;

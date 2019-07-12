@@ -12,6 +12,8 @@
 #define WM_MSG	WM_USER+1
 
 #define FRAME_CUSUM_CNT	400				//原始图像累加和设置，步进为100帧，100-800可调
+#define WIDTH 250
+#define HEIGHT 400
 
 // CMFCApplication1Dlg 对话框
 class CMFCApplication1Dlg : public CDialogEx
@@ -33,6 +35,8 @@ public:
 	void Display_image_byself(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight);
 	void Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight);
 	void Display_slow(int iWidth, int iHeight);
+	void slow_disp();
+
 
 	// 对话框数据
 #ifdef AFX_DESIGN_TIME
@@ -72,6 +76,11 @@ protected:
 	float m_fSavetime;  //  保存毫秒数
 
 	int   m_package_count; // 要保存的包计数
+	int   m_temp_count; // 慢速展示的原始数据缓冲包计数
+	int   m_time_count; // 慢速间隔计数
+	int f_disp_location = 0;
+	int frame_offset = 0;
+
 	BOOL  m_Save_Package;   // 控制保存raw的标志变量
 
 	BOOL    m_bOpen;
@@ -81,7 +90,10 @@ protected:
 	BOOL    m_bRunning;
 	BOOL    m_rawproc = FALSE;
 	BOOL    m_bitproc = FALSE;
+	BOOL    m_bitdisp = FALSE;
 	BOOL    m_raw2video = FALSE;
+	BOOL    m_slow_proc = FALSE;
+	BOOL    m_display_slow = FALSE;
 
 	// 四个保存离线处理数据的标志变量
 	BOOL    f_save_slow_video = TRUE;
@@ -90,8 +102,11 @@ protected:
 	BOOL    f_save_slow_img_bit = FALSE;
 
 	HANDLE  m_hThread;
-	HANDLE  m_hThread_slow; // 自己的脉冲窗口展示线程 记录
 	HANDLE  m_hThread_self; //自己的时间窗口展示线程 记录
+	HANDLE  m_hThread_slow_data = INVALID_HANDLE_VALUE; // 慢速数据处理线程 记录
+	HANDLE  m_hThread_slow = INVALID_HANDLE_VALUE; // 自己的脉冲窗口展示线程 记录
+	
+
 	HANDLE  m_hThread_save; // 保存线程的状态记录
 	HANDLE  m_hThread_raw2video = INVALID_HANDLE_VALUE; //离线线程记录
 
@@ -99,7 +114,7 @@ protected:
 	HANDLE  m_rawMutex;
 	HANDLE  m_Event;
 	HANDLE  m_rawEvent;
-	
+	HANDLE  m_slow_data_Event;
 
 	UINT    m_uFrameCnt;
 	UINT    m_uImageBytes;
@@ -148,6 +163,9 @@ private:
 	BYTE *raw_data = NULL; // 分配原始数据包的缓冲区
 	BYTE *save_data_buffer = NULL;
 
+	BYTE *temp_data_buffer = NULL;
+	BYTE *temp_disp_data_buffer = NULL;
+	BYTE *temp_disp_bit_buffer = NULL;
 
 
 };

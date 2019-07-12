@@ -36,6 +36,7 @@ extern void msg(LPCSTR lpszFmt, ...);
 extern UINT __stdcall RemoteDebugThread(LPVOID param);
 extern UINT __stdcall show_self(LPVOID param);
 extern UINT __stdcall slow_Thread1(LPVOID param);
+extern UINT __stdcall slow_disp_Thread(LPVOID param);
 extern UINT __stdcall save_Thread(LPVOID param);
 extern UINT __stdcall offline_data_proc(LPVOID param);
 extern void getFiles(string path, vector<string>& files);
@@ -252,12 +253,11 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 	uint irow = 0;
 	uint itime = 0;
 
-	while (m_bitproc) {
+	while (m_slow_proc) {
+		WaitForSingleObject(m_slow_data_Event, INFINITE);
 
-		if (f_cachebit) {
-			f_cachebit = FALSE;
-
-			memcpy(pulse, raw_data, FRAME_CUSUM_CNT * 250 * 50);
+		for (int ii = 0; ii < 5; ii++) {
+			memcpy(pulse, temp_data_buffer+ ii*FRAME_CUSUM_CNT * 250 * 50, FRAME_CUSUM_CNT * 250 * 50);
 
 			for (iframe = 0; iframe < FRAME_CUSUM_CNT; iframe++)
 			{
@@ -330,14 +330,28 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 						gray[mm] = 0;
 					}
 				}
-				memcpy(slowdata + iframe * 400 * 250, gray, 400 * 250);
-				memcpy(slowdata_bit + iframe * 400 * 250, bit_img, 400 * 250);
-			}
-		}
 
-		Sleep(10);
-		Display_slow(iWidth, iHeight);
+				memcpy(temp_disp_data_buffer + f_disp_location * 5 * FRAME_CUSUM_CNT * 250 * 400 +
+					ii*FRAME_CUSUM_CNT * 400 * 250 + iframe * 400 * 250, 
+					gray, 
+					FRAME_CUSUM_CNT * 400 * 250);
+				memcpy(temp_disp_bit_buffer + f_disp_location * 5 * FRAME_CUSUM_CNT * 250 * 400 +
+					ii*FRAME_CUSUM_CNT * 400 * 250 + iframe * 400 * 250,
+					bit_img,
+					FRAME_CUSUM_CNT * 400 * 250);
+			}
+
+
+		}
+		if (m_hThread_slow == INVALID_HANDLE_VALUE)
+			m_hThread_slow = (HANDLE)_beginthreadex(NULL, 0, &slow_disp_Thread, this, 0, 0);
+	
+		if (f_disp_location == 0)
+			f_disp_location = 1;
+		else
+			f_disp_location = 0;
 	}
+	
 
 	delete[] pulse;
 	delete[] interval;
@@ -345,6 +359,42 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 	delete[] gray_first;
 	delete[] gray;
 	delete[] bit_img;
+}
+void CMFCApplication1Dlg::slow_disp()
+{
+
+	int iWidth = WIDTH;
+	int iHeight = HEIGHT;
+	int offset = 5 * FRAME_CUSUM_CNT * 400 * 250;
+	Mat img(Size(iWidth, iHeight), CV_8UC1);
+	uchar *data = img.data;
+	;
+	while (m_display_slow) {
+		frame_offset++;
+		memcpy(data,
+			temp_disp_data_buffer + offset * f_disp_location + (frame_offset*slow_rate + 150)*iWidth*iHeight,
+			iWidth*iHeight);
+
+		resize(img, img, Size(sl_rect.Width(), sl_rect.Height()));
+		flip(img, img, 0);
+		imshow("SL", img);
+		waitKey(10);
+
+		Mat bit_img(Size(iWidth, iHeight), CV_8UC1);
+		data = bit_img.data;
+		memset(data, 0x0, iHeight*iWidth);
+
+		memcpy(data,
+			temp_disp_bit_buffer + offset * f_disp_location + (frame_offset*slow_rate + 150)*iWidth*iHeight,
+			iWidth*iHeight);
+
+		resize(bit_img, bit_img, Size(pl_rect.Width(), pl_rect.Height()));
+		flip(bit_img, bit_img, 0);
+		imshow("PL", bit_img);
+		waitKey(10);
+	}
+	
+	
 }
 
 void CMFCApplication1Dlg::Display_slow(int iWidth, int iHeight)
@@ -429,9 +479,9 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 		m_hThread_self = (HANDLE)_beginthreadex(NULL, 0, &show_self, this, 0, 0);
 	}
 
-	if (!m_bitproc) {
-		m_bitproc = TRUE;
-		m_hThread_slow = (HANDLE)_beginthreadex(NULL, 0, &slow_Thread1, this, 0, 0);
+	if (!m_slow_proc) {
+		m_slow_proc = TRUE;
+		m_hThread_slow_data = (HANDLE)_beginthreadex(NULL, 0, &slow_Thread1, this, 0, 0);
 
 	}
 

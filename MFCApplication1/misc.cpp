@@ -109,6 +109,20 @@ UINT __stdcall slow_Thread1(LPVOID param)
 	return 0;
 }
 
+UINT __stdcall slow_disp_Thread(LPVOID param)
+{
+	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
+	BYTE *pInData = param_buffer.pInData;
+	ULONG uDataSize = param_buffer.uDataSize;
+	BYTE *pOutBuffer = param_buffer.pOutBuffer;
+	int iWidth = param_buffer.iWidth;
+	int iHeight = param_buffer.iHeight;
+
+	pDlg->slow_disp();
+
+	return 0;
+}
+
 UINT __stdcall save_Thread(LPVOID param)
 {
 	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;

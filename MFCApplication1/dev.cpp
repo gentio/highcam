@@ -459,6 +459,16 @@ void CMFCApplication1Dlg::WorkProc()
 
 			}
 
+			//是否到达下个周期的慢速展示
+			if (m_temp_count > 0) {
+				memcpy(temp_data_buffer+(5-m_temp_count)*FRAME_CUSUM_CNT*250*50
+					, pBuffer, FRAME_CUSUM_CNT * 250 * 50);
+				m_temp_count--;
+				if (m_temp_count == 0)
+					SetEvent(m_slow_data_Event);
+			}
+			
+
 			DataProc(bOrgImage, pBuffer, uDataSize, pOutBuffer, iWidth, iHeight);
 		}
 
