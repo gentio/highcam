@@ -136,6 +136,9 @@ public:
 	afx_msg void SetSaveTime();
 	
 	afx_msg void raw2video();
+
+	afx_msg void SetPower();
+	afx_msg void SetFreq();
 private:
 	// 慢速窗口放慢的倍数
 	int slow_rate = 10;
@@ -144,6 +147,7 @@ private:
 	BYTE *slowdata_bit = NULL;
 	BYTE *raw_data = NULL; // 分配原始数据包的缓冲区
 	BYTE *save_data_buffer = NULL;
+
 
 
 };

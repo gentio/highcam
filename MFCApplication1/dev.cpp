@@ -513,3 +513,72 @@ void CMFCApplication1Dlg::WorkProc()
 
 	msg("WorkProc Exit\n");
 }
+
+
+
+void CMFCApplication1Dlg::SetPower()
+{
+	UpdateData(TRUE);
+
+	//设置电压，电流
+	SENSOR_POWER Power[10];
+	int Volt[10];
+	int Current[10];
+	BOOL OnOff[10];
+	CURRENT_RANGE range[5];
+
+	Power[0] = POWER_AVDD;
+	Volt[0] = (int)(m_fAvdd * 1000); // 2.8V
+	Current[0] = 300; // 300mA
+	OnOff[0] = TRUE;
+	range[0] = CURRENT_RANGE_MA;
+
+	Power[1] = POWER_DOVDD;
+	Volt[1] = (int)(m_fDovdd * 1000); // 1.8V
+	Current[1] = 300; // 300mA
+	OnOff[1] = TRUE;
+	range[1] = CURRENT_RANGE_MA;
+
+	Power[2] = POWER_DVDD;
+	Volt[2] = (int)(m_fDvdd * 1000);// 1.2V
+	Current[2] = 300;// 300mA
+	OnOff[2] = TRUE;
+	range[2] = CURRENT_RANGE_MA;
+
+	Power[3] = POWER_AFVCC;
+	Volt[3] = (int)(m_fAfvcc * 1000); // 2.8V
+	Current[3] = 300; // 300mA
+	OnOff[3] = TRUE;
+	range[3] = CURRENT_RANGE_MA;
+
+	Power[4] = POWER_VPP;
+	Volt[4] = (int)(m_fVpp * 1000);
+	Current[4] = 300; // 300mA
+	OnOff[4] = TRUE;
+	range[4] = CURRENT_RANGE_MA;
+
+	//设置5路电压值
+	int iRet = PmuSetVoltage(Power, Volt, 5, m_nDevID);
+	if (iRet != DT_ERROR_OK)
+	{
+		msg("Set Voltage failed with err:%d\n", iRet);
+	}
+	else
+	{
+		msg("成功设置电压值\n");
+	}
+}
+
+void CMFCApplication1Dlg::SetFreq()
+{
+	UpdateData(TRUE);
+	int iRet = SetSensorClock(TRUE, (USHORT)(m_fMclk * 10), m_nDevID);
+	if (iRet != DT_ERROR_OK)
+	{
+		msg("Set MCLK failed with err:%d\n", iRet);
+	}
+	else
+	{
+		msg("成功设置工作频率\n");
+	}
+}

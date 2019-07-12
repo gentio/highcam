@@ -117,7 +117,13 @@ CMFCApplication1Dlg::CMFCApplication1Dlg(CWnd* pParent /*=NULL*/)
 }
 CMFCApplication1Dlg::~CMFCApplication1Dlg()
 {
-	
+	/* 如果相机没有手动关闭而直接关闭应用程序，那么下次打开程序的时候
+	图像恢复出来会出现间隔的条纹，但是在程序关闭的时候手动执行关闭相机会让程序等待太久的情况，
+	这个时候会出现类似windows关机时候而直接杀掉程序的情况，这个时候相机也是没能自动关闭
+	现在，默认关闭程序不要关闭相机
+	*/
+
+	/*
 	if (m_bRunning) {
 
 
@@ -135,7 +141,7 @@ CMFCApplication1Dlg::~CMFCApplication1Dlg()
 			MessageBox("ERROR!!! Can't close the ");
 		}
 	}
-	
+	*/
 	delete[] slowdata;
 	delete[] slowdata_bit;
 	delete[] raw_data;
@@ -160,6 +166,14 @@ void CMFCApplication1Dlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Check(pDX, save_slow_video_bit, f_save_slow_video_bit);
 	DDX_Check(pDX, save_slow_img, f_save_slow_img);
 	DDX_Check(pDX, save_slow_img_bit, f_save_slow_img_bit);
+
+	DDX_Text(pDX, AVDD, m_fAvdd);
+	DDX_Text(pDX, DOVDD, m_fDovdd);
+	DDX_Text(pDX, DVDD, m_fDvdd);
+	DDX_Text(pDX, AFVCC, m_fAfvcc);
+	DDX_Text(pDX, VPP, m_fVpp);
+
+	DDX_Text(pDX, MCLK, m_fMclk);
 }
 
 BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
@@ -172,6 +186,8 @@ BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_BN_CLICKED(CLOSE_CAM, &CMFCApplication1Dlg::OnBnClickedCam)
 	ON_BN_CLICKED(SET_SAVETIME, &CMFCApplication1Dlg::SetSaveTime)
 	ON_BN_CLICKED(Offline_Data2, &CMFCApplication1Dlg::raw2video)
+	ON_BN_CLICKED(CLOSE_CAM2, &CMFCApplication1Dlg::SetPower)
+	ON_BN_CLICKED(IDC_BUTTON1, &CMFCApplication1Dlg::SetFreq)
 END_MESSAGE_MAP()
 
 
@@ -478,4 +494,10 @@ void CMFCApplication1Dlg::raw2video()
 
 	// TODO: 在此添加控件通知处理程序代码
 }
+
+
+
+
+
+
 
