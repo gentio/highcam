@@ -38,39 +38,9 @@ extern class cparamlist param_buffer;
 
 
 // 通用信息处理函数，用来描述设备信息的
-void msg(LPCSTR lpszFmt, ...)
-{
-	static CMFCApplication1Dlg* pDlg = NULL;
 
-	char *szTmp = (char*)malloc(512);
 
-	if (szTmp != NULL)
-	{
-		va_list argList;
-		va_start(argList, lpszFmt);
-		_vsnprintf(szTmp, 512, lpszFmt, argList);
-		va_end(argList);
-
-		if (pDlg == NULL)
-		{
-			pDlg = (CMFCApplication1Dlg*)AfxGetMainWnd();
-		}
-
-		if (pDlg != NULL)
-		{
-			if (!PostMessage(pDlg->GetSafeHwnd(), WM_MSG, (WPARAM)szTmp, 0))
-			{
-				free(szTmp);
-			}
-		}
-		else
-		{
-			free(szTmp);
-		}
-	}
-}
-
-UINT __stdcall RemoteDebugThread(LPVOID param)
+UINT __stdcall get_data_thread(LPVOID param)
 {
 	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
 	pDlg->WorkProc();
@@ -81,7 +51,7 @@ UINT __stdcall RemoteDebugThread(LPVOID param)
 
 
 
-UINT __stdcall show_self(LPVOID param)
+UINT __stdcall rt_display_thread(LPVOID param)
 {
 	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
 	BYTE *pInData = param_buffer.pInData;
@@ -90,12 +60,12 @@ UINT __stdcall show_self(LPVOID param)
 	int iWidth = param_buffer.iWidth;
 	int iHeight = param_buffer.iHeight;
 
-	pDlg->Display_image_byself(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
+	pDlg->rt_display(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
 
 	return 0;
 }
 
-UINT __stdcall slow_Thread1(LPVOID param)
+UINT __stdcall slow_data_thread(LPVOID param)
 {
 	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
 	BYTE *pInData = param_buffer.pInData;
@@ -104,12 +74,12 @@ UINT __stdcall slow_Thread1(LPVOID param)
 	int iWidth = param_buffer.iWidth;
 	int iHeight = param_buffer.iHeight;
 
-	pDlg->Display_slow_data(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
+	pDlg->procdata_for_slow(pInData, uDataSize, pOutBuffer, iWidth, iHeight);
 
 	return 0;
 }
 
-UINT __stdcall slow_disp_Thread(LPVOID param)
+UINT __stdcall slow_display_thread(LPVOID param)
 {
 	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
 	BYTE *pInData = param_buffer.pInData;
@@ -118,19 +88,19 @@ UINT __stdcall slow_disp_Thread(LPVOID param)
 	int iWidth = param_buffer.iWidth;
 	int iHeight = param_buffer.iHeight;
 
-	pDlg->slow_disp();
+	pDlg->slow_display();
 
 	return 0;
 }
 
-UINT __stdcall save_Thread(LPVOID param)
+UINT __stdcall save_raw_thread(LPVOID param)
 {
 	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
 	pDlg->save_raw_data();
 	return 0;
 }
 
-UINT __stdcall offline_data_proc(LPVOID param)
+UINT __stdcall offline_proc_thread(LPVOID param)
 {
 	CMFCApplication1Dlg *pDlg = (CMFCApplication1Dlg*)param;
 	pDlg->load_and_proc();
@@ -161,5 +131,38 @@ void getFiles(string path, vector<string>& files)
 			}
 		} while (_findnext(hFile, &fileinfo) == 0);
 		_findclose(hFile);
+	}
+}
+
+
+void msg(LPCSTR lpszFmt, ...)
+{
+	static CMFCApplication1Dlg* pDlg = NULL;
+
+	char *szTmp = (char*)malloc(512);
+
+	if (szTmp != NULL)
+	{
+		va_list argList;
+		va_start(argList, lpszFmt);
+		_vsnprintf(szTmp, 512, lpszFmt, argList);
+		va_end(argList);
+
+		if (pDlg == NULL)
+		{
+			pDlg = (CMFCApplication1Dlg*)AfxGetMainWnd();
+		}
+
+		if (pDlg != NULL)
+		{
+			if (!PostMessage(pDlg->GetSafeHwnd(), WM_MSG, (WPARAM)szTmp, 0))
+			{
+				free(szTmp);
+			}
+		}
+		else
+		{
+			free(szTmp);
+		}
 	}
 }

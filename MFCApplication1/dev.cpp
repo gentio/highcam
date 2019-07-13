@@ -30,11 +30,11 @@ using namespace cv;
 #endif
 
 extern void msg(LPCSTR lpszFmt, ...);
-extern UINT __stdcall RemoteDebugThread(LPVOID param);
-extern UINT __stdcall show_self(LPVOID param);
-extern UINT __stdcall slow_Thread1(LPVOID param);
-extern UINT __stdcall save_Thread(LPVOID param);
-extern UINT __stdcall offline_data_proc(LPVOID param);
+extern UINT __stdcall get_data_thread(LPVOID param);
+extern UINT __stdcall rt_display_thread(LPVOID param);
+extern UINT __stdcall slow_data_thread(LPVOID param);
+extern UINT __stdcall save_raw_thread(LPVOID param);
+extern UINT __stdcall offline_proc_thread(LPVOID param);
 extern void getFiles(string path, vector<string>& files);
 
 
@@ -144,7 +144,8 @@ int CMFCApplication1Dlg::start_dev()
 		UpdateData(TRUE);
 		// 启动工作线程
 		m_bRunning = TRUE;
-		m_hThread = (HANDLE)_beginthreadex(NULL, 0, &RemoteDebugThread, this, 0, 0);
+		m_hThread = (HANDLE)_beginthreadex(NULL, 0, &get_data_thread, this, 0, 0);
+
 
 	}
 	else
@@ -446,26 +447,26 @@ void CMFCApplication1Dlg::WorkProc()
 			m_uFrameCnt++;
 			m_uImageBytes = uDataSize;
 
-			WaitForSingleObject(m_Mutex, INFINITE);
+			WaitForSingleObject(Mutex_rt, INFINITE);
 			memcpy(raw_data, pBuffer, FRAME_CUSUM_CNT * 250 * 50);
-			ReleaseMutex(m_Mutex);
+			ReleaseMutex(Mutex_rt);
 
 			// 是否保原始数据
 			if (m_package_count > 0) {
-				WaitForSingleObject(m_rawMutex, INFINITE);
+				WaitForSingleObject(Mutex_save, INFINITE);
 				memcpy(save_data_buffer, pBuffer, FRAME_CUSUM_CNT * 250 * 50);
-				ReleaseMutex(m_rawMutex);
-				SetEvent(m_rawEvent);
+				ReleaseMutex(Mutex_save);
+				SetEvent(Event_save);
 
 			}
-
+			
 			//是否到达下个周期的慢速展示
 			if (m_temp_count > 0) {
 				memcpy(temp_data_buffer+(5-m_temp_count)*FRAME_CUSUM_CNT*250*50
 					, pBuffer, FRAME_CUSUM_CNT * 250 * 50);
 				m_temp_count--;
 				if (m_temp_count == 0)
-					SetEvent(m_slow_data_Event);
+					SetEvent(Event_slow);
 			}
 			
 

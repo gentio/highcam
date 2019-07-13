@@ -38,11 +38,11 @@ class cparamlist param_buffer;
 #pragma comment (lib,".\\DTCCM2_SDK\\dtccm2.lib")
 
 extern void msg(LPCSTR lpszFmt, ...);
-extern UINT __stdcall RemoteDebugThread(LPVOID param);
-extern UINT __stdcall show_self(LPVOID param);
-extern UINT __stdcall slow_Thread1(LPVOID param);
-extern UINT __stdcall save_Thread(LPVOID param);
-extern UINT __stdcall offline_data_proc(LPVOID param);
+extern UINT __stdcall get_data_thread(LPVOID param);
+extern UINT __stdcall rt_display_thread(LPVOID param);
+extern UINT __stdcall slow_data_thread(LPVOID param);
+extern UINT __stdcall save_raw_thread(LPVOID param);
+extern UINT __stdcall offline_proc_thread(LPVOID param);
 extern void getFiles(string path, vector<string>& files);
 
 class CAboutDlg : public CDialogEx
@@ -92,7 +92,7 @@ CMFCApplication1Dlg::CMFCApplication1Dlg(CWnd* pParent /*=NULL*/)
 	, m_nDevID(0)
 	, m_bRunning(FALSE)
 	, m_hThread(INVALID_HANDLE_VALUE)
-	, m_hThread_save(INVALID_HANDLE_VALUE)
+	, m_hThread_save_raw(INVALID_HANDLE_VALUE)
 	, m_fAvdd(2.8f)
 	, m_fDovdd(1.8f)
 	, m_fDvdd(1.8f)
@@ -133,10 +133,10 @@ CMFCApplication1Dlg::~CMFCApplication1Dlg()
 		m_bRunning = FALSE;
 
 		WaitForSingleObject(m_hThread, INFINITE);
-		m_rawproc = FALSE;
+		m_rt_display = FALSE;
 		m_bitproc = FALSE;
-		WaitForSingleObject(m_hThread_slow, INFINITE);
-		WaitForSingleObject(m_hThread_self, INFINITE);
+		WaitForSingleObject(m_hThread_slow_display, INFINITE);
+		WaitForSingleObject(m_hThread_rt, INFINITE);
 
 		int iRet = CloseDevice(m_nDevID);
 		if (iRet != DT_ERROR_OK)
@@ -255,8 +255,10 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	//ShowWindow(SW_MAXIMIZE);
 
 	// TODO: 在此添加额外的初始化代码
-	m_Mutex = CreateMutex(NULL, FALSE, NULL);
-	m_rawMutex = CreateMutex(NULL, FALSE, NULL);
+
+
+	Mutex_rt = CreateMutex(NULL, FALSE, NULL);
+	Mutex_save = CreateMutex(NULL, FALSE, NULL);
 
 
 	// 500毫秒的定时器，用作状态刷新
@@ -377,20 +379,23 @@ LRESULT CMFCApplication1Dlg::OnMsg(WPARAM wP, LPARAM lP)
 
 void CMFCApplication1Dlg::Found_Cam()
 {
+	
 	if (m_bRunning) {
 		MessageBox("相机已经在运行！！！！");
 	} 
-	else
+	else 
 	{
-		enum_dev();
-		open_dev();
-		start_dev();
+		if (!enum_dev())
+		{
+			open_dev();
+			start_dev();
+		}
+			
 	}
 	
 	if (!m_bRunning) {
-		OnBnClickedCam();
+		//OnBnClickedCam();
 		msg("Can't Found the Camera!");
-		
 	}
 	
 	// TODO: 在此添加控件通知处理程序代码
@@ -429,6 +434,7 @@ void CMFCApplication1Dlg::OnTimer(UINT_PTR nIDEvent)
 	{
 		m_temp_count = 5;
 		frame_offset = 0;
+		
 	}
 	
 	CDialogEx::OnTimer(nIDEvent);
@@ -437,27 +443,29 @@ void CMFCApplication1Dlg::OnTimer(UINT_PTR nIDEvent)
 void CMFCApplication1Dlg::OnBnClickedCam()
 {
 	if (!m_bRunning) {
-		MessageBox("相机未在工作，无需关闭");
+		MessageBox("相机未在工作，无需关闭\n");
 	}
 	else {
 	
 		m_bRunning = FALSE;
-
 		WaitForSingleObject(m_hThread, INFINITE);
-		m_rawproc = FALSE;
-		m_bitproc = FALSE;
-		WaitForSingleObject(m_hThread_slow, INFINITE);
-		WaitForSingleObject(m_hThread_self, INFINITE);
-		
+
+		m_rt_display = FALSE;
+		WaitForSingleObject(m_hThread_rt, INFINITE);
+
 		m_slow_proc = FALSE;
 		WaitForSingleObject(m_hThread_slow_data, INFINITE);
+
 		m_display_slow = FALSE;
-		WaitForSingleObject(m_hThread_slow, INFINITE);
+		WaitForSingleObject(m_hThread_slow_display, INFINITE);
+			
+		
+
 		
 
 		m_hThread = INVALID_HANDLE_VALUE;
-		m_hThread_slow = INVALID_HANDLE_VALUE;
-		m_hThread_self = INVALID_HANDLE_VALUE;
+		m_hThread_slow_display = INVALID_HANDLE_VALUE;
+		m_hThread_rt = INVALID_HANDLE_VALUE;
 
 		int iRet = CloseDevice(m_nDevID);
 		if (iRet == DT_ERROR_OK)
@@ -497,7 +505,7 @@ void CMFCApplication1Dlg::raw2video()
 	else {
 		m_raw2video = TRUE;
 		//if (m_hThread_raw2video == INVALID_HANDLE_VALUE)
-			m_hThread_raw2video = (HANDLE)_beginthreadex(NULL, 0, &offline_data_proc, this, 0, 0);
+			m_hThread_raw2video = (HANDLE)_beginthreadex(NULL, 0, &offline_proc_thread, this, 0, 0);
 
 	}
 

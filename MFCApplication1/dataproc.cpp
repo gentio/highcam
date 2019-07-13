@@ -33,12 +33,12 @@ using namespace cv;
 extern class cparamlist param_buffer;
 
 extern void msg(LPCSTR lpszFmt, ...);
-extern UINT __stdcall RemoteDebugThread(LPVOID param);
-extern UINT __stdcall show_self(LPVOID param);
-extern UINT __stdcall slow_Thread1(LPVOID param);
-extern UINT __stdcall slow_disp_Thread(LPVOID param);
-extern UINT __stdcall save_Thread(LPVOID param);
-extern UINT __stdcall offline_data_proc(LPVOID param);
+extern UINT __stdcall get_data_thread(LPVOID param);
+extern UINT __stdcall rt_display_thread(LPVOID param);
+extern UINT __stdcall slow_data_thread(LPVOID param);
+extern UINT __stdcall slow_display_thread(LPVOID param);
+extern UINT __stdcall save_raw_thread(LPVOID param);
+extern UINT __stdcall offline_proc_thread(LPVOID param);
 extern void getFiles(string path, vector<string>& files);
 
 #pragma comment (lib,".\\DTCCM2_SDK\\dtccm2.lib")
@@ -123,7 +123,7 @@ void CMFCApplication1Dlg::Display_image_from_camera(BYTE *pInData, ULONG uDataSi
 	Sleep(5);
 
 }
-void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight)
+void CMFCApplication1Dlg::rt_display(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight)
 {
 
 	int iPixels = iWidth * iHeight;
@@ -152,12 +152,12 @@ void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, B
 	Mat img(Size(iWidth, iHeight), CV_8UC1);
 	Mat img1(Size(rt_rect.Width(), rt_rect.Height()), CV_8UC1);
 
-	while (m_rawproc) {
-		WaitForSingleObject(m_Event, INFINITE);
+	while (m_rt_display) {
+		WaitForSingleObject(Event_rt, INFINITE);
 
-		WaitForSingleObject(m_Mutex, INFINITE);
+		WaitForSingleObject(Mutex_rt, INFINITE);
 		memcpy(pulse, raw_data, FRAME_CUSUM_CNT * 250 * 50);
-		ReleaseMutex(m_Mutex);
+		ReleaseMutex(Mutex_rt);
 
 
 		memset(img.data, 0x0, iHeight*iWidth);
@@ -212,10 +212,10 @@ void CMFCApplication1Dlg::Display_image_byself(BYTE *pInData, ULONG uDataSize, B
 		equalizeHist(img1, img1);
 		imshow("RT", img1);
 		waitKey(5);
-		Sleep(5);
+		
 	}
 }
-void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight)
+void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight)
 {
 	int height = 250;
 	int width = 400;
@@ -252,69 +252,74 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 
 	uint irow = 0;
 	uint itime = 0;
+	int ii = 0;
 
 	while (m_slow_proc) {
-		WaitForSingleObject(m_slow_data_Event, INFINITE);
-
-		for (int ii = 0; ii < 5; ii++) {
+		WaitForSingleObject(Event_slow, INFINITE);
+		frame = 0;
+		for (ii = 0; ii < 5; ii++) {
 			memcpy(pulse, temp_data_buffer+ ii*FRAME_CUSUM_CNT * 250 * 50, FRAME_CUSUM_CNT * 250 * 50);
+
 
 			for (iframe = 0; iframe < FRAME_CUSUM_CNT; iframe++)
 			{
-				frame = iframe;
+				
 				memset(bit_img, 0x0, iWidth*iHeight);
+				frame = ii * FRAME_CUSUM_CNT + iframe;
+
 				for (irow = 0; irow < 250; irow++)
 				{
 					for (itime = 0; itime < 50; itime++)//每行52个字节
 					{
 
-						if (pulse[frame * 50 * 250 + irow * 50 + itime] & q1)
+						if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q1)
 						{
 							interval[8 * 50 * irow + 8 * itime] = frame - label[8 * 50 * irow + 8 * itime];
 							label[8 * 50 * irow + 8 * itime] = frame;
 							bit_img[8 * 50 * irow + 8 * itime] = 0xff;
 						}
-						if (pulse[frame * 50 * 250 + irow * 50 + itime] & q2)
+						if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q2)
 						{
 							interval[8 * 50 * irow + 8 * itime + 1] = frame - label[8 * 50 * irow + 8 * itime + 1];
 							label[8 * 50 * irow + 8 * itime + 1] = frame;
 							bit_img[8 * 50 * irow + 8 * itime + 1] = 0xff;
 						}
-						if (pulse[frame * 50 * 250 + irow * 50 + itime] & q3)
+						if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q3)
 						{
 							interval[8 * 50 * irow + 8 * itime + 2] = frame - label[8 * 50 * irow + 8 * itime + 2];
 							label[8 * 50 * irow + 8 * itime + 2] = frame;
 							bit_img[8 * 50 * irow + 8 * itime + 2] = 0xff;
 						}
-						if (pulse[frame * 50 * 250 + irow * 50 + itime] & q4)
+						if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q4)
 						{
 							interval[8 * 50 * irow + 8 * itime + 3] = frame - label[8 * 50 * irow + 8 * itime + 3];
 							label[8 * 50 * irow + 8 * itime + 3] = frame;
 							bit_img[8 * 50 * irow + 8 * itime + 3] = 0xff;
 						}
-						if (pulse[frame * 50 * 250 + irow * 50 + itime] & q5)
+						if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q5)
 						{
 							interval[8 * 50 * irow + 8 * itime + 4] = frame - label[8 * 50 * irow + 8 * itime + 4];
 							label[8 * 50 * irow + 8 * itime + 4] = frame;
 							bit_img[8 * 50 * irow + 8 * itime + 4] = 0xff;
 						}
-						if (pulse[frame * 50 * 250 + irow * 50 + itime] & q6)
+						if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q6)
 						{
 							interval[8 * 50 * irow + 8 * itime + 5] = frame - label[8 * 50 * irow + 8 * itime + 5];
 							label[8 * 50 * irow + 8 * itime + 5] = frame;
 							bit_img[8 * 50 * irow + 8 * itime + 5] = 0xff;
 						}
-						if (pulse[frame * 50 * 250 + irow * 50 + itime] & q7)
+						if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q7)
 						{
 							interval[8 * 50 * irow + 8 * itime + 6] = frame - label[8 * 50 * irow + 8 * itime + 6];
 							label[8 * 50 * irow + 8 * itime + 6] = frame;
 							bit_img[8 * 50 * irow + 8 * itime + 6] = 0xff;
 						}
-						if (pulse[frame * 50 * 250 + irow * 50 + itime] & q8)
+						if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q8)
 						{
 							interval[8 * 50 * irow + 8 * itime + 7] = frame - label[8 * 50 * irow + 8 * itime + 7];
 							label[8 * 50 * irow + 8 * itime + 7] = frame;
 							bit_img[8 * 50 * irow + 8 * itime + 7] = 0xff;
+
 						}
 					}
 				}
@@ -322,8 +327,8 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 				{
 					if (interval[mm] != 0)
 					{
-						gray_first[mm] = (1600 / interval[mm] > 255) ? 255 : ((1600 / interval[mm]) & 0xff);;
-						gray[mm] = gray_first[mm];
+						//gray_first[mm] = (1600 / interval[mm] > 255) ? 255 : ((1600 / interval[mm]) & 0xff);
+						gray[mm] = (1600 / interval[mm] > 255) ? 255 : ((1600 / interval[mm]) & 0xff);
 					}
 					if (interval[mm] == 0)
 					{
@@ -334,17 +339,20 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 				memcpy(temp_disp_data_buffer + f_disp_location * 5 * FRAME_CUSUM_CNT * 250 * 400 +
 					ii*FRAME_CUSUM_CNT * 400 * 250 + iframe * 400 * 250, 
 					gray, 
-					FRAME_CUSUM_CNT * 400 * 250);
+					400 * 250);
 				memcpy(temp_disp_bit_buffer + f_disp_location * 5 * FRAME_CUSUM_CNT * 250 * 400 +
 					ii*FRAME_CUSUM_CNT * 400 * 250 + iframe * 400 * 250,
 					bit_img,
-					FRAME_CUSUM_CNT * 400 * 250);
+					400 * 250);
 			}
 
 
 		}
-		if (m_hThread_slow == INVALID_HANDLE_VALUE)
-			m_hThread_slow = (HANDLE)_beginthreadex(NULL, 0, &slow_disp_Thread, this, 0, 0);
+		if (!m_display_slow) {
+			m_display_slow = TRUE;
+			m_hThread_slow_display = (HANDLE)_beginthreadex(NULL, 0, &slow_display_thread, this, 0, 0);
+		}
+			
 	
 		if (f_disp_location == 0)
 			f_disp_location = 1;
@@ -360,37 +368,41 @@ void CMFCApplication1Dlg::Display_slow_data(BYTE *pInData, ULONG uDataSize, BYTE
 	delete[] gray;
 	delete[] bit_img;
 }
-void CMFCApplication1Dlg::slow_disp()
+void CMFCApplication1Dlg::slow_display()
 {
 
 	int iWidth = WIDTH;
 	int iHeight = HEIGHT;
 	int offset = 5 * FRAME_CUSUM_CNT * 400 * 250;
 	Mat img(Size(iWidth, iHeight), CV_8UC1);
+	Mat bit_img(Size(iWidth, iHeight), CV_8UC1);
+	
+	Mat img1(Size(rt_rect.Width(), rt_rect.Height()), CV_8UC1);
 	uchar *data = img.data;
-	;
+	
 	while (m_display_slow) {
 		frame_offset++;
+		data = img.data;
 		memcpy(data,
 			temp_disp_data_buffer + offset * f_disp_location + (frame_offset*slow_rate + 150)*iWidth*iHeight,
 			iWidth*iHeight);
 
-		resize(img, img, Size(sl_rect.Width(), sl_rect.Height()));
-		flip(img, img, 0);
-		imshow("SL", img);
+		resize(img, img1, Size(sl_rect.Width(), sl_rect.Height()));
+		flip(img1, img1, 0);
+		imshow("SL", img1);
 		waitKey(10);
 
-		Mat bit_img(Size(iWidth, iHeight), CV_8UC1);
+		
 		data = bit_img.data;
-		memset(data, 0x0, iHeight*iWidth);
+		
 
 		memcpy(data,
 			temp_disp_bit_buffer + offset * f_disp_location + (frame_offset*slow_rate + 150)*iWidth*iHeight,
 			iWidth*iHeight);
 
-		resize(bit_img, bit_img, Size(pl_rect.Width(), pl_rect.Height()));
-		flip(bit_img, bit_img, 0);
-		imshow("PL", bit_img);
+		resize(bit_img, img1, Size(pl_rect.Width(), pl_rect.Height()));
+		flip(img1, img1, 0);
+		imshow("PL", img1);
 		waitKey(10);
 	}
 	
@@ -428,10 +440,10 @@ void CMFCApplication1Dlg::save_raw_data()
 	int count = 0;
 	msg("Saving %d data\n", m_package_count);
 	while (m_package_count > 0) {
-		WaitForSingleObject(m_rawEvent, INFINITE);
-		WaitForSingleObject(m_rawMutex, INFINITE);
+		WaitForSingleObject(Event_save, INFINITE);
+		WaitForSingleObject(Mutex_save, INFINITE);
 		memcpy(buffer, save_data_buffer, FRAME_CUSUM_CNT * 250 * 50);
-		ReleaseMutex(m_rawMutex);
+		ReleaseMutex(Mutex_save);
 
 		SYSTEMTIME tm;
 		CString str;
@@ -471,28 +483,27 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 	param_buffer.uDataSize = uDataSize;
 
 
-	SetEvent(m_Event);
+	SetEvent(Event_rt);
 
-	if (!m_rawproc) {
-		m_rawproc = TRUE;
+	if (!m_rt_display) {
+		m_rt_display = TRUE;
 
-		m_hThread_self = (HANDLE)_beginthreadex(NULL, 0, &show_self, this, 0, 0);
+		m_hThread_rt = (HANDLE)_beginthreadex(NULL, 0, &rt_display_thread, this, 0, 0);
 	}
 
 	if (!m_slow_proc) {
 		m_slow_proc = TRUE;
-		m_hThread_slow_data = (HANDLE)_beginthreadex(NULL, 0, &slow_Thread1, this, 0, 0);
-
+		m_hThread_slow_data = (HANDLE)_beginthreadex(NULL, 0, &slow_data_thread, this, 0, 0);
 	}
 
 	if (m_Save_Package) {
-		if (m_hThread_save == INVALID_HANDLE_VALUE) {
-			m_hThread_save = (HANDLE)_beginthreadex(NULL, 0, &save_Thread, this, 0, 0);
+		if (m_hThread_save_raw == INVALID_HANDLE_VALUE) {
+			m_hThread_save_raw = (HANDLE)_beginthreadex(NULL, 0, &save_raw_thread, this, 0, 0);
 
 		}
 	}
 	else {
-		m_hThread_save = INVALID_HANDLE_VALUE;
+		m_hThread_save_raw = INVALID_HANDLE_VALUE;
 	}
 
 
@@ -547,17 +558,17 @@ void CMFCApplication1Dlg::load_and_proc()
 	char * filePath = ".//temdata";
 	char * distAll = "AllFiles.txt";
 	getFiles(filePath, files);
-	ofstream ofn(distAll);
+	//ofstream ofn(distAll);
 	int file_count = files.size();
 	msg("Files to proc: %d\n", file_count);
 
 
-	ofn << file_count << endl;
-	for (int i = 0; i<file_count; i++)
-	{
-		ofn << files[i] << endl;
-	}
-	ofn.close();
+	//ofn << file_count << endl;
+	//for (int i = 0; i<file_count; i++)
+	//{
+	//	ofn << files[i] << endl;
+	//}
+//	ofn.close();
 
 	long length = FRAME_CUSUM_CNT * 250 * 50;
 
