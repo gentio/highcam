@@ -30,6 +30,8 @@ using namespace cv;
 #endif
 
 
+extern deque<img_buffer> img_que;
+extern deque<img_buffer> img_que_bit;
 extern class cparamlist param_buffer;
 
 extern void msg(LPCSTR lpszFmt, ...);
@@ -214,6 +216,8 @@ void CMFCApplication1Dlg::rt_display(BYTE *pInData, ULONG uDataSize, BYTE *pOutB
 		waitKey(5);
 		
 	}
+	delete[] pulse;
+	msg("退出实时展示线程\n");
 }
 void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE *pOutBuffer, int iWidth, int iHeight)
 {
@@ -236,9 +240,17 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 	uint* interval = new uint[250 * 400];
 	uint* label = new uint[250 * 400];
 	uint* gray_first = new uint[250 * 400];
-	uchar* gray = new uchar[250 * 400];
-	uchar* bit_img = new uchar[250 * 400];
 
+	//uchar* gray = new uchar[250 * 400];
+	//uchar* bit_img = new uchar[250 * 400];
+
+	img_buffer tmp;
+	img_buffer tmp_bit;
+
+
+	uchar *gray = tmp.data;
+	uchar *bit_img = tmp_bit.data;
+	//img_que.push_back(tmp);
 
 	for (int jj = 0; jj < 250 * 40 / 8; jj++)
 	{
@@ -335,7 +347,7 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 						gray[mm] = 0;
 					}
 				}
-
+				/*
 				memcpy(temp_disp_data_buffer + f_disp_location * 5 * FRAME_CUSUM_CNT * 250 * 400 +
 					ii*FRAME_CUSUM_CNT * 400 * 250 + iframe * 400 * 250, 
 					gray, 
@@ -344,14 +356,32 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 					ii*FRAME_CUSUM_CNT * 400 * 250 + iframe * 400 * 250,
 					bit_img,
 					400 * 250);
+					*/
+				//img_que.insert()
+				if (frame % 5 == 0) {
+					WaitForSingleObject(Mutex_deque, INFINITE);
+					if (frame == 0)
+					{
+						img_que.clear();
+						img_que_bit.clear();
+
+					}
+						
+					//if (img_que.size() > 400)
+					//	img_que.pop_front();
+					img_que.push_back(tmp);
+
+					//if (img_que_bit.size() > 400)
+					//	img_que_bit.pop_front();
+					img_que_bit.push_back(tmp_bit);
+					ReleaseMutex(Mutex_deque);
+				}
+				
 			}
 
 
 		}
-		if (!m_display_slow) {
-			m_display_slow = TRUE;
-			m_hThread_slow_display = (HANDLE)_beginthreadex(NULL, 0, &slow_display_thread, this, 0, 0);
-		}
+		
 			
 	
 		if (f_disp_location == 0)
@@ -360,13 +390,13 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 			f_disp_location = 0;
 	}
 	
-
+	msg("退出慢速展示数据处理线程\n");
 	delete[] pulse;
 	delete[] interval;
 	delete[] label;
 	delete[] gray_first;
-	delete[] gray;
-	delete[] bit_img;
+	//delete[] gray;
+	//delete[] bit_img;
 }
 void CMFCApplication1Dlg::slow_display()
 {
@@ -380,32 +410,63 @@ void CMFCApplication1Dlg::slow_display()
 	Mat img1(Size(rt_rect.Width(), rt_rect.Height()), CV_8UC1);
 	uchar *data = img.data;
 	
+	//Mat img2 = imread("e:/raw/try/123.jpg");
+	//resize(img2, img2, Size(sl_rect.Width(), sl_rect.Height()));
+
 	while (m_display_slow) {
 		frame_offset++;
-		data = img.data;
-		memcpy(data,
-			temp_disp_data_buffer + offset * f_disp_location + (frame_offset*slow_rate + 150)*iWidth*iHeight,
-			iWidth*iHeight);
-
-		resize(img, img1, Size(sl_rect.Width(), sl_rect.Height()));
-		flip(img1, img1, 0);
-		imshow("SL", img1);
-		waitKey(10);
-
+		//msg("sfasdfsdf  %d\n", frame_offset);
+		//data = img.data;
+		//memcpy(data,
+		//	temp_disp_data_buffer + offset * f_disp_location + (frame_offset*slow_rate + 150)*iWidth*iHeight,
+		//	iWidth*iHeight);
 		
-		data = bit_img.data;
 		
+			WaitForSingleObject(Mutex_deque, INFINITE);
+			
+			if (img_que.size() > 0) {
+				img_buffer tmp_buffer(img_que.front());
+				img.data = tmp_buffer.data;
 
-		memcpy(data,
-			temp_disp_bit_buffer + offset * f_disp_location + (frame_offset*slow_rate + 150)*iWidth*iHeight,
-			iWidth*iHeight);
+				resize(img, img1, Size(sl_rect.Width(), sl_rect.Height()));
+				msg("the size of deque is %d\n", img_que.size());
+				flip(img1, img1, 0);
+				imshow("SL", img1);
+				img_que.pop_front();
 
-		resize(bit_img, img1, Size(pl_rect.Width(), pl_rect.Height()));
-		flip(img1, img1, 0);
-		imshow("PL", img1);
-		waitKey(10);
-	}
+				img_buffer tmp_buffer_bit(img_que_bit.front());
+				bit_img.data = tmp_buffer_bit.data;
+
+				resize(bit_img, img1, Size(sl_rect.Width(), sl_rect.Height()));
+				//msg("the size of deque is %d\n", img_que.size());
+				flip(img1, img1, 0);
+				imshow("PL", img1);
+				img_que_bit.pop_front();
+			}
+			
+			ReleaseMutex(Mutex_deque);
+
+			
+		//	waitKey(15);
+		
+		
+		waitKey(50);
+		
 	
+		
+		//data = bit_img.data;
+		
+
+	//	memcpy(data,
+	//		temp_disp_bit_buffer + offset * f_disp_location + (frame_offset*slow_rate + 150)*iWidth*iHeight,
+	//		iWidth*iHeight);
+
+		//resize(bit_img, img1, Size(pl_rect.Width(), pl_rect.Height()));
+		//flip(img1, img1, 0);
+		///imshow("PL", img1);
+		//waitKey(10);
+	}
+	msg("退出慢速展示线程\n");
 	
 }
 
@@ -491,9 +552,15 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 		m_hThread_rt = (HANDLE)_beginthreadex(NULL, 0, &rt_display_thread, this, 0, 0);
 	}
 
+
 	if (!m_slow_proc) {
 		m_slow_proc = TRUE;
 		m_hThread_slow_data = (HANDLE)_beginthreadex(NULL, 0, &slow_data_thread, this, 0, 0);
+	}
+
+	if (!m_display_slow) {
+		m_display_slow = TRUE;
+		m_hThread_slow_display = (HANDLE)_beginthreadex(NULL, 0, &slow_display_thread, this, 0, 0);
 	}
 
 	if (m_Save_Package) {

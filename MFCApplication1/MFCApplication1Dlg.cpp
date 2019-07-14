@@ -45,6 +45,21 @@ extern UINT __stdcall save_raw_thread(LPVOID param);
 extern UINT __stdcall offline_proc_thread(LPVOID param);
 extern void getFiles(string path, vector<string>& files);
 
+deque<img_buffer> img_que;
+deque<img_buffer> img_que_bit;
+
+img_buffer::img_buffer()
+{
+	for (int i = 0; i < WIDTH*HEIGHT; i++)
+		data[i] = 0;
+}
+
+img_buffer::img_buffer(const img_buffer &rhs)
+{
+	for (int i = 0; i < WIDTH*HEIGHT; i++)
+		data[i] = rhs.data[i];
+}
+
 class CAboutDlg : public CDialogEx
 {
 public:
@@ -115,8 +130,8 @@ CMFCApplication1Dlg::CMFCApplication1Dlg(CWnd* pParent /*=NULL*/)
 	save_data_buffer = new BYTE[FRAME_CUSUM_CNT * 250 * 80];
 
 	temp_data_buffer = new BYTE[5*FRAME_CUSUM_CNT * 250 * 80]; //慢速展示数据的缓冲区
-	temp_disp_data_buffer = new BYTE[10*FRAME_CUSUM_CNT * 250 * 400];
-	temp_disp_bit_buffer = new BYTE[10 * FRAME_CUSUM_CNT * 250 * 400];
+	//temp_disp_data_buffer = new BYTE[10*FRAME_CUSUM_CNT * 250 * 400];
+	//temp_disp_bit_buffer = new BYTE[10 * FRAME_CUSUM_CNT * 250 * 400];
 }
 CMFCApplication1Dlg::~CMFCApplication1Dlg()
 {
@@ -259,7 +274,7 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 
 	Mutex_rt = CreateMutex(NULL, FALSE, NULL);
 	Mutex_save = CreateMutex(NULL, FALSE, NULL);
-
+	Mutex_deque = CreateMutex(NULL, FALSE, NULL);
 
 	// 500毫秒的定时器，用作状态刷新
 	SetTimer(0, 500, NULL);
@@ -454,18 +469,20 @@ void CMFCApplication1Dlg::OnBnClickedCam()
 		WaitForSingleObject(m_hThread_rt, INFINITE);
 
 		m_slow_proc = FALSE;
-		WaitForSingleObject(m_hThread_slow_data, INFINITE);
+		//SetEvent (Event_slow);
+		//WaitForSingleObject(m_hThread_slow_data, INFINITE);
 
 		m_display_slow = FALSE;
 		WaitForSingleObject(m_hThread_slow_display, INFINITE);
 			
-		
+	
 
 		
 
 		m_hThread = INVALID_HANDLE_VALUE;
-		m_hThread_slow_display = INVALID_HANDLE_VALUE;
 		m_hThread_rt = INVALID_HANDLE_VALUE;
+		m_hThread_slow_data = INVALID_HANDLE_VALUE;
+		m_hThread_slow_display = INVALID_HANDLE_VALUE;
 
 		int iRet = CloseDevice(m_nDevID);
 		if (iRet == DT_ERROR_OK)

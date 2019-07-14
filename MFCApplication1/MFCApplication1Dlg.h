@@ -20,6 +20,9 @@
 //using namespace cv;
 
 class img_buffer {
+public:
+	img_buffer();
+	img_buffer(const img_buffer &rhs);
 	BYTE data[WIDTH*HEIGHT];
 };
 
@@ -125,6 +128,7 @@ protected:
 	// 一些互斥量和 事件标志变量
 	HANDLE  Mutex_rt;  // 读取数据线程与实时窗口展示线程的互斥量
 	HANDLE  Mutex_save;
+	HANDLE  Mutex_deque;
 
 	HANDLE  Event_rt;
 	HANDLE  Event_save;
@@ -170,7 +174,7 @@ public:
 	afx_msg void SetPower();
 	afx_msg void SetFreq();
 
-//	deque<img_buffer> img_que;
+
 private:
 
 	

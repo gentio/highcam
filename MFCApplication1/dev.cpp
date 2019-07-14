@@ -466,7 +466,11 @@ void CMFCApplication1Dlg::WorkProc()
 					, pBuffer, FRAME_CUSUM_CNT * 250 * 50);
 				m_temp_count--;
 				if (m_temp_count == 0)
+				{
 					SetEvent(Event_slow);
+					msg("≤‚ ‘º‰∏Ù ±º‰\n");
+				}
+					
 			}
 			
 
