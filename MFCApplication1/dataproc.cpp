@@ -267,6 +267,7 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 	int ii = 0;
 
 	while (m_slow_proc) {
+		int64 start = getTickCount();
 		WaitForSingleObject(Event_slow, INFINITE);
 		frame = 0;
 		for (ii = 0; ii < 5; ii++) {
@@ -358,14 +359,16 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 					400 * 250);
 					*/
 				//img_que.insert()
-				if (frame % 5 == 0) {
+				if (frame == 0)
+				{
 					WaitForSingleObject(Mutex_deque, INFINITE);
-					if (frame == 0)
-					{
-						img_que.clear();
-						img_que_bit.clear();
-
-					}
+					img_que.clear();
+					img_que_bit.clear();
+					ReleaseMutex(Mutex_deque);
+				}
+				if (frame % 5 == 0 && frame > 100) {
+					WaitForSingleObject(Mutex_deque, INFINITE);
+					
 						
 					//if (img_que.size() > 400)
 					//	img_que.pop_front();
@@ -382,7 +385,8 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 
 		}
 		
-			
+		double durtion = (getTickCount() - start) / getTickFrequency();
+		msg("Time durtion : %f\n", durtion);
 	
 		if (f_disp_location == 0)
 			f_disp_location = 1;
@@ -397,6 +401,7 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 	delete[] gray_first;
 	//delete[] gray;
 	//delete[] bit_img;
+	m_slow_proc = FALSE;
 }
 void CMFCApplication1Dlg::slow_display()
 {
@@ -429,7 +434,7 @@ void CMFCApplication1Dlg::slow_display()
 				img.data = tmp_buffer.data;
 
 				resize(img, img1, Size(sl_rect.Width(), sl_rect.Height()));
-				msg("the size of deque is %d\n", img_que.size());
+				//msg("the size of deque is %d\n", img_que.size());
 				flip(img1, img1, 0);
 				imshow("SL", img1);
 				img_que.pop_front();
@@ -542,9 +547,15 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 	param_buffer.pInData = pInData;
 	param_buffer.pOutBuffer = pOutBuffer;
 	param_buffer.uDataSize = uDataSize;
-
-
-	SetEvent(Event_rt);
+	
+	if (f_display)
+	{
+		SetEvent(Event_rt);
+		f_display = FALSE;
+	}
+		
+	else
+		f_display = TRUE;
 
 	if (!m_rt_display) {
 		m_rt_display = TRUE;

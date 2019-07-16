@@ -276,6 +276,12 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	Mutex_save = CreateMutex(NULL, FALSE, NULL);
 	Mutex_deque = CreateMutex(NULL, FALSE, NULL);
 
+	Event_rt = CreateEvent(NULL, FALSE, FALSE, _T("RT"));
+	Event_save = CreateEvent(NULL, FALSE, FALSE, _T("SAVE"));
+	Event_slow = CreateEvent(NULL, FALSE, FALSE, _T("slow"));
+	
+
+
 	// 500毫秒的定时器，用作状态刷新
 	SetTimer(0, 500, NULL);
 	// 用于统计帧率
@@ -463,14 +469,18 @@ void CMFCApplication1Dlg::OnBnClickedCam()
 	else {
 	
 		m_bRunning = FALSE;
+		SetEvent(Event_rt);
 		WaitForSingleObject(m_hThread, INFINITE);
+		ResetEvent(Event_rt);
 
 		m_rt_display = FALSE;
 		WaitForSingleObject(m_hThread_rt, INFINITE);
 
 		m_slow_proc = FALSE;
-		//SetEvent (Event_slow);
-		//WaitForSingleObject(m_hThread_slow_data, INFINITE);
+		SetEvent (Event_slow);
+		m_slow_proc = FALSE;
+		WaitForSingleObject(m_hThread_slow_data, INFINITE);
+		ResetEvent(Event_rt);
 
 		m_display_slow = FALSE;
 		WaitForSingleObject(m_hThread_slow_display, INFINITE);

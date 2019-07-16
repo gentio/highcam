@@ -109,6 +109,8 @@ protected:
 	BOOL    m_display_slow = FALSE;
 	BOOL f_cachebit = FALSE;
 
+	BOOL f_display = FALSE;
+
 	// 四个保存离线处理数据的标志变量
 	BOOL    f_save_slow_video = TRUE;
 	BOOL    f_save_slow_video_bit = FALSE;
@@ -130,9 +132,9 @@ protected:
 	HANDLE  Mutex_save;
 	HANDLE  Mutex_deque;
 
-	HANDLE  Event_rt;
-	HANDLE  Event_save;
-	HANDLE  Event_slow;
+	HANDLE  Event_rt = INVALID_HANDLE_VALUE;
+	HANDLE  Event_save = INVALID_HANDLE_VALUE;
+	HANDLE  Event_slow = INVALID_HANDLE_VALUE;
 
 
 
