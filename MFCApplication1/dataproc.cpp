@@ -267,9 +267,12 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 	int ii = 0;
 
 	while (m_slow_proc) {
-		int64 start = getTickCount();
+		//int64 start = getTickCount();
+
 		WaitForSingleObject(Event_slow, INFINITE);
 		frame = 0;
+
+		uint rates = slow_rates;
 		for (ii = 0; ii < 5; ii++) {
 			memcpy(pulse, temp_data_buffer+ ii*FRAME_CUSUM_CNT * 250 * 50, FRAME_CUSUM_CNT * 250 * 50);
 
@@ -366,17 +369,15 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 					img_que_bit.clear();
 					ReleaseMutex(Mutex_deque);
 				}
-				if (frame % 5 == 0 && frame > 100) {
-					WaitForSingleObject(Mutex_deque, INFINITE);
-					
-						
-					//if (img_que.size() > 400)
-					//	img_que.pop_front();
-					img_que.push_back(tmp);
 
-					//if (img_que_bit.size() > 400)
-					//	img_que_bit.pop_front();
-					img_que_bit.push_back(tmp_bit);
+				if (frame % rates == 0 && frame > 100) {
+					WaitForSingleObject(Mutex_deque, INFINITE);
+				
+					if (img_que.size() < 400) {
+						img_que.push_back(tmp);
+						img_que_bit.push_back(tmp_bit);
+					}
+			
 					ReleaseMutex(Mutex_deque);
 				}
 				
@@ -385,13 +386,10 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 
 		}
 		
-		double durtion = (getTickCount() - start) / getTickFrequency();
-		msg("Time durtion : %f\n", durtion);
+		//double durtion = (getTickCount() - start) / getTickFrequency();
+		//msg("the rates is %d \n", rates);
+		//msg("Time durtion : %f\n", durtion);
 	
-		if (f_disp_location == 0)
-			f_disp_location = 1;
-		else
-			f_disp_location = 0;
 	}
 	
 	msg("退出慢速展示数据处理线程\n");
@@ -548,8 +546,9 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 	param_buffer.pOutBuffer = pOutBuffer;
 	param_buffer.uDataSize = uDataSize;
 	
-	if (f_display)
+	if (f_display) // 展示50帧太吃力了，改成每间隔一个数据包进行展示
 	{
+		
 		SetEvent(Event_rt);
 		f_display = FALSE;
 	}

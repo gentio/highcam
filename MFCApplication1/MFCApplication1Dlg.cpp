@@ -177,10 +177,12 @@ void CMFCApplication1Dlg::DoDataExchange(CDataExchange* pDX)
 	//DDX_Control(pDX, Slow_Display, m_slow);
 	DDX_Control(pDX, RT_FPS, m_fps);
 	DDX_Control(pDX, Rawdata, m_rawdata);
-	DDX_Control(pDX, SLOWIMG, m_slowimg);
+	
 	DDX_Control(pDX, CAM_CHOOSE, m_wndDevList);
 
+
 	DDX_Text(pDX, SAVEMS, m_fSavetime);
+	DDX_Text(pDX, INPUTSLOWRATES, m_slowrates);
 
 	DDX_Check(pDX, save_slow_video, f_save_slow_video);
 	DDX_Check(pDX, save_slow_video_bit, f_save_slow_video_bit);
@@ -208,6 +210,7 @@ BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_BN_CLICKED(Offline_Data2, &CMFCApplication1Dlg::raw2video)
 	ON_BN_CLICKED(CLOSE_CAM2, &CMFCApplication1Dlg::SetPower)
 	ON_BN_CLICKED(IDC_BUTTON1, &CMFCApplication1Dlg::SetFreq)
+	ON_BN_CLICKED(SLOWRATES, &CMFCApplication1Dlg::set_slow_rates)
 END_MESSAGE_MAP()
 
 
@@ -429,21 +432,21 @@ void CMFCApplication1Dlg::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == 0)
 	{
 		CString str;
-		CString str_raw;
-		CString str_slow;
+		//CString str_raw;
+		//CString str_slow;
 
-		str.Format("FrameCount: %u, Rate: %.3ffps\n",
+		str.Format("已捕获数据包: %u\n每秒数据包: %.3f\n",
 			m_uFrameCnt, m_fFrameRate);
 
-		str_raw.Format("前 %d 秒的原始脉冲图像放慢 %d 倍显示\n", 
-			 f_cachebit_count/ 2, (int) m_fFrameRate * 400 / slow_rate);
+		//str_raw.Format("前 %d 秒的原始脉冲图像放慢 %d 倍显示\n", 
+		//	 f_cachebit_count/ 2, (int) m_fFrameRate * 400 / slow_rate);
 			
-		str_slow.Format("前 %d 秒脉冲间隔恢复图像放慢 %d 倍显示\n",
-			 f_cachebit_count / 2, (int) m_fFrameRate * 400 / slow_rate);
+		//str_slow.Format("前 %d 秒脉冲间隔恢复图像放慢 %d 倍显示\n",
+		//	 f_cachebit_count / 2, (int) m_fFrameRate * 400 / slow_rate);
 
 		m_fps.SetWindowText(str);
-		m_rawdata.SetWindowText(str_raw);
-		m_slowimg.SetWindowText(str_slow);
+//		m_rawdata.SetWindowText(str_raw);
+	//	m_slowimg.SetWindowText(str_slow);
 
 	}
 	else if (nIDEvent == 1)
@@ -546,3 +549,16 @@ void CMFCApplication1Dlg::raw2video()
 
 
 
+
+
+void CMFCApplication1Dlg::set_slow_rates()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	UpdateData(TRUE);
+
+	slow_rates = (uint)m_slowrates;
+	
+	if (slow_rates < 1 || slow_rates > 25)
+		slow_rates = 5;
+	msg("设置放慢倍数: %d\n", (UINT)(20000 / slow_rates));
+}

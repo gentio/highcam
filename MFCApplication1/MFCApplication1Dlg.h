@@ -57,13 +57,13 @@ protected:
 	CEdit m_editMsg;
 	CString m_strIniFile;
 	CComboBox m_wndDevList;
-	CComboBox COMBOFPS;
+	
 	CStatic m_wndVideo;
 	CStatic m_slow;
 
 	CStatic m_fps;
 	CStatic m_rawdata;
-	CStatic m_slowimg;
+	//CStatic m_slowimg;
 
 
 	// 一些相机相关的记录
@@ -84,6 +84,9 @@ protected:
 	float m_fVpp;
 	float m_fMclk;
 	float m_fSavetime;  //  保存毫秒数
+
+	float m_slowrates;
+	UINT  slow_rates = 5;
 
 	int   m_package_count; // 要保存的包计数
 	int   m_temp_count = 0; // 慢速展示的原始数据缓冲包计数
@@ -191,6 +194,8 @@ private:
 	BYTE *temp_disp_bit_buffer = NULL;
 
 
+public:
+	afx_msg void set_slow_rates();
 };
 
 class cparamlist {

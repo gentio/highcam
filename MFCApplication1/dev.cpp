@@ -468,7 +468,7 @@ void CMFCApplication1Dlg::WorkProc()
 				if (m_temp_count == 0)
 				{
 					SetEvent(Event_slow);
-					msg("测试间隔时间\n");
+					//msg("测试间隔时间\n");
 				}
 					
 			}
