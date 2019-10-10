@@ -211,7 +211,8 @@ void CMFCApplication1Dlg::rt_display(BYTE *pInData, ULONG uDataSize, BYTE *pOutB
 		}
 		resize(img, img1, Size(rt_rect.Width(), rt_rect.Height()));
 		flip(img1, img1, 0);
-		equalizeHist(img1, img1);
+		// 直方图均衡，但是效果不好
+		// equalizeHist(img1, img1);   
 		imshow("RT", img1);
 		waitKey(5);
 		
@@ -627,9 +628,6 @@ void CMFCApplication1Dlg::load_and_proc()
 	if (!writer_bit.isOpened()) {
 		MessageBox("Can't open the bit video files to write");
 	}
-
-	//msg("The value of codecc is %d\n", codec);
-
 	vector<string> files;
 
 	char * filePath = ".//temdata";
@@ -640,12 +638,6 @@ void CMFCApplication1Dlg::load_and_proc()
 	msg("Files to proc: %d\n", file_count);
 
 
-	//ofn << file_count << endl;
-	//for (int i = 0; i<file_count; i++)
-	//{
-	//	ofn << files[i] << endl;
-	//}
-//	ofn.close();
 
 	long length = FRAME_CUSUM_CNT * 250 * 50;
 
@@ -669,10 +661,11 @@ void CMFCApplication1Dlg::load_and_proc()
 		label[jj] = 0x00;
 	}
 
+	uint frame = 0;
+	uint framecount;
 	uint itemp = 0;
 	uint iframe = 0;
-	uint frame;
-	uint framecount;
+	
 	uint irow = 0;
 	uint itime = 0;
 	CString filename;
@@ -685,21 +678,27 @@ void CMFCApplication1Dlg::load_and_proc()
 	{
 		filename.Format(".//temdata//%d.dat", isize);
 		ifstream file(filename, ios::in | ios::binary);
+
 		file.seekg(0, ios::end);
 		length = file.tellg();
 		file.seekg(0, ios::beg);
+
 		file.read((char*)pulse, length);
 		file.close();
 
 		sprintf(tmp, "Processing %d\\%d \n", isize + 1, file_count);
 		msg(tmp);
 
+		
+
 		for (iframe = 0; iframe< FRAME_CUSUM_CNT; iframe++)
 		{
-			framecount++;
-
 			memset(bit_img, 0x0, width*height);
-			frame = isize * FRAME_CUSUM_CNT + iframe;
+
+			framecount++;
+			frame++;
+
+			//frame = isize * FRAME_CUSUM_CNT + iframe;
 
 			for (irow = 0; irow < 250; irow++)
 			{
