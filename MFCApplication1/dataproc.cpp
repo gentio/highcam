@@ -157,6 +157,10 @@ void CMFCApplication1Dlg::rt_display(BYTE *pInData, ULONG uDataSize, BYTE *pOutB
 	while (m_rt_display) {
 		WaitForSingleObject(Event_rt, INFINITE);
 
+		if (!m_rt_display)
+			break;
+
+
 		WaitForSingleObject(Mutex_rt, INFINITE);
 		memcpy(pulse, raw_data, FRAME_CUSUM_CNT * 250 * 50);
 		ReleaseMutex(Mutex_rt);
@@ -271,6 +275,10 @@ void CMFCApplication1Dlg::procdata_for_slow(BYTE *pInData, ULONG uDataSize, BYTE
 		//int64 start = getTickCount();
 
 		WaitForSingleObject(Event_slow, INFINITE);
+
+		if (!m_slow_proc)
+			break;
+
 		frame = 0;
 
 		uint rates = slow_rates;
@@ -501,35 +509,43 @@ void CMFCApplication1Dlg::Display_slow(int iWidth, int iHeight)
 
 void CMFCApplication1Dlg::save_raw_data()
 {
-	BYTE *buffer = new BYTE[FRAME_CUSUM_CNT * 250 * 50];
+	BYTE *buffer = new BYTE[FRAME_CUSUM_CNT * 250 * 50 *( m_package_count+1)];
+	const int counts = m_package_count;
+
 	int count = 0;
 	msg("Saving %d data\n", m_package_count);
 	while (m_package_count > 0) {
 		WaitForSingleObject(Event_save, INFINITE);
 		WaitForSingleObject(Mutex_save, INFINITE);
-		memcpy(buffer, save_data_buffer, FRAME_CUSUM_CNT * 250 * 50);
+		memcpy(buffer+count * FRAME_CUSUM_CNT * 250 * 50
+			, save_data_buffer, FRAME_CUSUM_CNT * 250 * 50);
 		ReleaseMutex(Mutex_save);
 
+		count++;
+		m_package_count--;
+	}
+	
+
+	for (int i = 0; i < counts; i++) {
 		SYSTEMTIME tm;
 		CString str;
 		CFile file;
 		::GetLocalTime(&tm);
-		str.Format(".//temdata//%d.dat", count);
+		str.Format(".//temdata//%d.dat", i);
 		if (file.Open(str, CFile::modeCreate | CFile::modeWrite, NULL))
 		{
-			file.Write(buffer, FRAME_CUSUM_CNT * 250 * 50);
+			file.Write(buffer + i * FRAME_CUSUM_CNT * 250 * 50
+				, FRAME_CUSUM_CNT * 250 * 50);
 			file.Close();
 			msg("写入文件%s\r\n", str);
-			count++;
+			//count++;
 		}
 		else
 		{
 			msg("Can't open the file to save\n");
 		}
-
-		m_package_count--;
-
 	}
+	
 
 	delete[] buffer;
 	m_Save_Package = FALSE;
@@ -547,15 +563,14 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 	param_buffer.pOutBuffer = pOutBuffer;
 	param_buffer.uDataSize = uDataSize;
 	
-	if (f_display) // 展示50帧太吃力了，改成每间隔一个数据包进行展示
-	{
-		
+	// 展示50帧太吃力了，改成每间隔一个数据包进行展示
+	if (f_display) {
 		SetEvent(Event_rt);
 		f_display = FALSE;
+	} else {
+		f_display = TRUE;
 	}
 		
-	else
-		f_display = TRUE;
 
 	if (!m_rt_display) {
 		m_rt_display = TRUE;
@@ -577,10 +592,8 @@ void CMFCApplication1Dlg::DataProc(BOOL bOrgImg, BYTE *pInData, ULONG uDataSize,
 	if (m_Save_Package) {
 		if (m_hThread_save_raw == INVALID_HANDLE_VALUE) {
 			m_hThread_save_raw = (HANDLE)_beginthreadex(NULL, 0, &save_raw_thread, this, 0, 0);
-
 		}
-	}
-	else {
+	} else {
 		m_hThread_save_raw = INVALID_HANDLE_VALUE;
 	}
 
@@ -636,7 +649,8 @@ void CMFCApplication1Dlg::load_and_proc()
 	//ofstream ofn(distAll);
 	int file_count = files.size();
 	msg("Files to proc: %d\n", file_count);
-
+	
+//	int file_count = 10;
 
 
 	long length = FRAME_CUSUM_CNT * 250 * 50;
@@ -687,6 +701,7 @@ void CMFCApplication1Dlg::load_and_proc()
 		file.close();
 
 		sprintf(tmp, "Processing %d\\%d \n", isize + 1, file_count);
+
 		msg(tmp);
 
 		
@@ -761,12 +776,12 @@ void CMFCApplication1Dlg::load_and_proc()
 			{
 				if (interval[mm] != 0)
 				{
-					gray[mm] = (1600 / interval[mm]> 255) ? 255 : ((1600 / interval[mm]) & 0xff);
+					gray[mm] = (1600 / interval[mm]> 255) ? 255 : (1600 / interval[mm]);
 
 				}
 				if (interval[mm] == 0)
 				{
-					gray[mm] = 0;
+					gray[mm] = 255;
 				}
 			}
 

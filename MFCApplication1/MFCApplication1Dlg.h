@@ -50,8 +50,10 @@ protected:
 
 	// 与控件相关的变量，用来承载控件值
 	CRect rt_rect; // 实时展示窗口大小
-	CRect pl_rect; // 脉冲展示
-	CRect sl_rect; // 缓慢展示
+	CRect pl_rect; // 脉冲展示窗口大小
+	CRect sl_rect; // 缓慢展示窗口大小
+
+
 	CString m_strIniPathName;
 	CEdit m_editStatus;
 	CEdit m_editMsg;
@@ -70,22 +72,24 @@ protected:
 	int     m_nDevID;
 	UINT    m_uFrameCnt;
 	UINT    m_uImageBytes;
-	FrameInfoEx m_frameInfo;
-	float   m_fFrameRate;
+	FrameInfoEx m_frameInfo; //相机自有的帧信息
+	float   m_fFrameRate;    
 	UINT    m_uFrameCntLast;
 	BOOL    m_bOriginalImage;
 	USHORT  m_uFrameCusum;
 
-	// 相机工作参数
+	// 相机工作参数 相机的电压参数等
 	float m_fAvdd;
 	float m_fDovdd;
 	float m_fDvdd;
 	float m_fAfvcc;
 	float m_fVpp;
 	float m_fMclk;
+
+
 	float m_fSavetime;  //  保存毫秒数
 
-	float m_slowrates;
+	float m_slowrates;  // 高速重构下的放慢倍率
 	UINT  slow_rates = 5;
 
 	int   m_package_count; // 要保存的包计数
@@ -110,7 +114,6 @@ protected:
 	BOOL    m_raw2video = FALSE;
 	BOOL    m_slow_proc = FALSE;
 	BOOL    m_display_slow = FALSE;
-	BOOL f_cachebit = FALSE;
 
 	BOOL f_display = FALSE;
 

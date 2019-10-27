@@ -115,6 +115,7 @@ int CMFCApplication1Dlg::open_dev()
 	}
 	else
 	{
+		
 		if (m_bRunning)
 		{
 			/* 先关闭测试线程 */
@@ -456,6 +457,7 @@ void CMFCApplication1Dlg::WorkProc()
 				WaitForSingleObject(Mutex_save, INFINITE);
 				memcpy(save_data_buffer, pBuffer, FRAME_CUSUM_CNT * 250 * 50);
 				ReleaseMutex(Mutex_save);
+				//唤醒沉睡的保存线程
 				SetEvent(Event_save);
 
 			}
@@ -472,7 +474,9 @@ void CMFCApplication1Dlg::WorkProc()
 				}
 					
 			}
-			
+			if (!m_bRunning)
+				break;
+
 
 			DataProc(bOrgImage, pBuffer, uDataSize, pOutBuffer, iWidth, iHeight);
 		}

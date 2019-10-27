@@ -411,6 +411,7 @@ void CMFCApplication1Dlg::Found_Cam()
 	{
 		if (!enum_dev())
 		{
+			//msg("hello after enum_dev function \n");
 			open_dev();
 			start_dev();
 		}
@@ -470,32 +471,51 @@ void CMFCApplication1Dlg::OnBnClickedCam()
 		MessageBox("相机未在工作，无需关闭\n");
 	}
 	else {
+
+	//	m_package_count = 1;
+	//	m_Save_Package = TRUE;
+
 	
 		m_bRunning = FALSE;
+		m_rt_display = FALSE;
 		SetEvent(Event_rt);
+
 		WaitForSingleObject(m_hThread, INFINITE);
 		ResetEvent(Event_rt);
 
-		m_rt_display = FALSE;
+		//m_rt_display = FALSE;
 		WaitForSingleObject(m_hThread_rt, INFINITE);
 
 		m_slow_proc = FALSE;
-		SetEvent (Event_slow);
-		m_slow_proc = FALSE;
-		WaitForSingleObject(m_hThread_slow_data, INFINITE);
-		ResetEvent(Event_rt);
+		SetEvent(Event_slow);
+		
+		//WaitForSingleObject(m_hThread_slow_data, INFINITE);
+		ResetEvent(Event_slow);
 
 		m_display_slow = FALSE;
-		WaitForSingleObject(m_hThread_slow_display, INFINITE);
+		//WaitForSingleObject(m_hThread_slow_display, INFINITE);
 			
 	
-
 		
+		m_rt_display = FALSE;
+		m_bitproc = FALSE;
+		m_bitdisp = FALSE;
+		m_raw2video = FALSE;
+		m_slow_proc = FALSE;
+		m_display_slow = FALSE;
+		f_display = FALSE;
+		 
+		 f_save_slow_video = TRUE; 
+		 f_save_slow_video_bit = FALSE;
+		 f_save_slow_img = FALSE; 
+		 f_save_slow_img_bit = FALSE;
 
 		m_hThread = INVALID_HANDLE_VALUE;
 		m_hThread_rt = INVALID_HANDLE_VALUE;
 		m_hThread_slow_data = INVALID_HANDLE_VALUE;
 		m_hThread_slow_display = INVALID_HANDLE_VALUE;
+
+		
 
 		int iRet = CloseDevice(m_nDevID);
 		if (iRet == DT_ERROR_OK)
