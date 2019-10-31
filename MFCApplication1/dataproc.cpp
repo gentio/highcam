@@ -180,43 +180,78 @@ void CMFCApplication1Dlg::rt_display(BYTE *pInData, ULONG uDataSize, BYTE *pOutB
 
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q1)
 					{
-						dbuffer[8 * 50 * irow + 8 * itime]++;
+						if (dbuffer[8 * 50 * irow + 8 * itime] < 256)
+							dbuffer[8 * 50 * irow + 8 * itime]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q2)
 					{
-						dbuffer[8 * 50 * irow + 8 * itime + 1]++;
+						if (dbuffer[8 * 50 * irow + 8 * itime + 1] < 256)
+							dbuffer[8 * 50 * irow + 8 * itime + 1]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q3)
 					{
-						dbuffer[8 * 50 * irow + 8 * itime + 2]++;
+						if (dbuffer[8 * 50 * irow + 8 * itime + 2] < 256)
+							dbuffer[8 * 50 * irow + 8 * itime + 2]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q4)
 					{
-						dbuffer[8 * 50 * irow + 8 * itime + 3]++;
+						if (dbuffer[8 * 50 * irow + 8 * itime + 3] < 256)
+							dbuffer[8 * 50 * irow + 8 * itime + 3]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q5)
 					{
-						dbuffer[8 * 50 * irow + 8 * itime + 4]++;
+						if (dbuffer[8 * 50 * irow + 8 * itime + 4] < 256)
+							dbuffer[8 * 50 * irow + 8 * itime + 4]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q6)
 					{
-						dbuffer[8 * 50 * irow + 8 * itime + 5]++;
+						if (dbuffer[8 * 50 * irow + 8 * itime + 5] < 256)
+							dbuffer[8 * 50 * irow + 8 * itime + 5]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q7)
 					{
-						dbuffer[8 * 50 * irow + 8 * itime + 6]++;
+						if (dbuffer[8 * 50 * irow + 8 * itime + 6] < 256)
+							dbuffer[8 * 50 * irow + 8 * itime + 6]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q8)
 					{
-						dbuffer[8 * 50 * irow + 8 * itime + 7]++;
+						if (dbuffer[8 * 50 * irow + 8 * itime + 7] < 256)
+							dbuffer[8 * 50 * irow + 8 * itime + 7]++;
 					}
 				}
 			}
 		}
+		// 怒写伽马纠正
+		/*
+		for (int i = 0; i < 400 * 250; i++) {
+			double value = dbuffer[i] / 255;
+			if (value > 0.5) {
+				value = pow(value, 1.1);
+				dbuffer[i] = (int) value * 255;
+			}
+			else if (value < 0.5) {
+				value = pow(value, 0.5);
+				dbuffer[i] = (int) value * 255;
+			}
+		}
+		*/
+
+		/*
+		Mat dst = img.clone();
+
+		img.convertTo(dst, CV_32FC1, 1/255.0);
+		cv::pow(dst, 0.03, dst);
+		cv::normalize(dst,img,0,255,NORM_MINMAX,CV_8UC1);
+		*/
+		
 		resize(img, img1, Size(rt_rect.Width(), rt_rect.Height()));
+
 		flip(img1, img1, 0);
+
 		// 直方图均衡，但是效果不好
-		// equalizeHist(img1, img1);   
+	    // equalizeHist(img1, img1);   
+
+		
 		imshow("RT", img1);
 		waitKey(5);
 		
