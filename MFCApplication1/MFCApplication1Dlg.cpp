@@ -211,6 +211,8 @@ BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_BN_CLICKED(CLOSE_CAM2, &CMFCApplication1Dlg::SetPower)
 	ON_BN_CLICKED(IDC_BUTTON1, &CMFCApplication1Dlg::SetFreq)
 	ON_BN_CLICKED(SLOWRATES, &CMFCApplication1Dlg::set_slow_rates)
+	ON_BN_CLICKED(IDC_BUTTON2, &CMFCApplication1Dlg::OnBnClickedButton2)
+	ON_BN_CLICKED(IDC_BUTTON5, &CMFCApplication1Dlg::OnBnClickedButton5)
 END_MESSAGE_MAP()
 
 
@@ -283,6 +285,22 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	Event_save = CreateEvent(NULL, FALSE, FALSE, _T("SAVE"));
 	Event_slow = CreateEvent(NULL, FALSE, FALSE, _T("slow"));
 	
+
+	// 初始化灰度值映射表
+	double f;
+	int final_v;
+	int i = 0;
+	for ( ; i < 128; i++) {
+		//f = i / 128;
+		f = pow(i, 0.45)*pow(128, 0.55);
+		//f = f * 128;
+		final_v = (int)f;
+		map_table[i] = final_v;
+	}
+	for (; i < 256; i++) {
+		map_table[i] = i;
+
+	}
 
 
 	// 500毫秒的定时器，用作状态刷新
@@ -581,4 +599,24 @@ void CMFCApplication1Dlg::set_slow_rates()
 	if (slow_rates < 1 || slow_rates > 25)
 		slow_rates = 5;
 	msg("设置放慢倍数: %d\n", (UINT)(20000 / slow_rates));
+}
+
+
+void CMFCApplication1Dlg::OnBnClickedButton2()
+{
+	// TODO: 在此添加控件通知处理程序代码
+
+	for (int i = 0; i < 256; i++) {
+		msg("%d values is %d\n",i, map_table[i]);
+
+	}
+}
+
+
+void CMFCApplication1Dlg::OnBnClickedButton5()
+{
+	
+
+
+
 }

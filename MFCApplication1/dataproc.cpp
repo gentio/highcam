@@ -180,42 +180,42 @@ void CMFCApplication1Dlg::rt_display(BYTE *pInData, ULONG uDataSize, BYTE *pOutB
 
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q1)
 					{
-						if (dbuffer[8 * 50 * irow + 8 * itime] < 256)
+						if (dbuffer[8 * 50 * irow + 8 * itime] < 255)
 							dbuffer[8 * 50 * irow + 8 * itime]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q2)
 					{
-						if (dbuffer[8 * 50 * irow + 8 * itime + 1] < 256)
+						if (dbuffer[8 * 50 * irow + 8 * itime + 1] < 255)
 							dbuffer[8 * 50 * irow + 8 * itime + 1]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q3)
 					{
-						if (dbuffer[8 * 50 * irow + 8 * itime + 2] < 256)
+						if (dbuffer[8 * 50 * irow + 8 * itime + 2] < 255)
 							dbuffer[8 * 50 * irow + 8 * itime + 2]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q4)
 					{
-						if (dbuffer[8 * 50 * irow + 8 * itime + 3] < 256)
+						if (dbuffer[8 * 50 * irow + 8 * itime + 3] < 255)
 							dbuffer[8 * 50 * irow + 8 * itime + 3]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q5)
 					{
-						if (dbuffer[8 * 50 * irow + 8 * itime + 4] < 256)
+						if (dbuffer[8 * 50 * irow + 8 * itime + 4] < 255)
 							dbuffer[8 * 50 * irow + 8 * itime + 4]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q6)
 					{
-						if (dbuffer[8 * 50 * irow + 8 * itime + 5] < 256)
+						if (dbuffer[8 * 50 * irow + 8 * itime + 5] < 255)
 							dbuffer[8 * 50 * irow + 8 * itime + 5]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q7)
 					{
-						if (dbuffer[8 * 50 * irow + 8 * itime + 6] < 256)
+						if (dbuffer[8 * 50 * irow + 8 * itime + 6] < 255)
 							dbuffer[8 * 50 * irow + 8 * itime + 6]++;
 					}
 					if (pulse[frame * 50 * 250 + irow * 50 + itime] & q8)
 					{
-						if (dbuffer[8 * 50 * irow + 8 * itime + 7] < 256)
+						if (dbuffer[8 * 50 * irow + 8 * itime + 7] < 255)
 							dbuffer[8 * 50 * irow + 8 * itime + 7]++;
 					}
 				}
@@ -243,6 +243,13 @@ void CMFCApplication1Dlg::rt_display(BYTE *pInData, ULONG uDataSize, BYTE *pOutB
 		cv::pow(dst, 0.03, dst);
 		cv::normalize(dst,img,0,255,NORM_MINMAX,CV_8UC1);
 		*/
+		int tmp_map;
+		for (int i = 0; i < 400 * 250; i++) {
+			if (dbuffer[i] < 128) {
+				tmp_map = dbuffer[i];
+				dbuffer[i] = map_table[tmp_map];
+			}
+		}
 		
 		resize(img, img1, Size(rt_rect.Width(), rt_rect.Height()));
 

@@ -199,6 +199,11 @@ private:
 
 public:
 	afx_msg void set_slow_rates();
+
+	int map_table[256];
+
+	afx_msg void OnBnClickedButton2();
+	afx_msg void OnBnClickedButton5();
 };
 
 class cparamlist {
