@@ -616,7 +616,187 @@ void CMFCApplication1Dlg::OnBnClickedButton2()
 void CMFCApplication1Dlg::OnBnClickedButton5()
 {
 	
+	
+	int height = 250;
+	int width = 400;
+	Mat img(Size(400, 250), CV_8UC1);
+	Mat img_bit(Size(400, 250), CV_8UC1);
 
+
+	uchar *dbuffer = img.data;
+	uchar *bit_img = img_bit.data;
+
+
+	VideoWriter writer;
+	VideoWriter writer_bit;
+	int codec = CV_FOURCC('D', 'I', 'V', 'X');
+
+	double fps = 50.0;                          // framerate of the created video stream
+	string video_filename_bit = "./slow_show_bit.m4v";     // name of the output video file
+	writer_bit.open(video_filename_bit, codec, fps, img_bit.size(), 0);
+
+	if (!writer_bit.isOpened()) {
+		MessageBox("Can't open the bit video files to write");
+	}
+	vector<string> files;
+
+	char * filePath = ".//temdata";
+	char * distAll = "AllFiles.txt";
+	getFiles(filePath, files);
+	
+	int file_count = files.size();
+	msg("Files to proc: %d\n", file_count);
+
+
+	long length = FRAME_CUSUM_CNT * 250 * 50;
+
+	uchar* pulse = new uchar[length];//length为像素个数/8
+	uint* interval = new uint[250 * 400];
+	uint* label = new uint[250 * 400];
+
+
+	uchar q1 = 1;
+	uchar q2 = 2;
+	uchar q3 = 4;
+	uchar q4 = 8;
+	uchar q5 = 16;
+	uchar q6 = 32;
+	uchar q7 = 64;
+	uchar q8 = 128;
+
+	
+
+	uint frame = 0;
+	uint framecount;
+	uint itemp = 0;
+	uint iframe = 0;
+
+	uint irow = 0;
+	uint itime = 0;
+	CString filename;
+
+	framecount = 0;
+	char tmp[500];
+
+
+	for (int isize = 0; isize < file_count; isize++)
+	{
+		filename.Format(".//temdata//%d.dat", isize);
+		ifstream file(filename, ios::in | ios::binary);
+
+		file.seekg(0, ios::end);
+		length = file.tellg();
+		file.seekg(0, ios::beg);
+
+		file.read((char*)pulse, length);
+		file.close();
+
+		sprintf(tmp, "Processing %d\\%d \n", isize + 1, file_count);
+
+		msg(tmp);
+
+
+		memset(dbuffer, 0x0, width*height);
+
+		for (iframe = 0; iframe< FRAME_CUSUM_CNT; iframe++)
+		{
+			memset(bit_img, 0x0, width*height);
+		
+
+
+			framecount++;
+			frame++;
+
+			//frame = isize * FRAME_CUSUM_CNT + iframe;
+
+			for (irow = 0; irow < 250; irow++)
+			{
+				for (itime = 0; itime < 50; itime++)//每行52个字节
+				{
+
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q1)
+					{
+						if (dbuffer[8 * 50 * irow + 8 * itime] < 255)
+							dbuffer[8 * 50 * irow + 8 * itime]++;
+						
+						bit_img[8 * 50 * irow + 8 * itime] = 0xff;
+					}
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q2)
+					{
+						if (dbuffer[8 * 50 * irow + 8 * itime + 1] < 255)
+							dbuffer[8 * 50 * irow + 8 * itime + 1]++;
+						bit_img[8 * 50 * irow + 8 * itime + 1] = 0xff;
+					}
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q3)
+					{
+						if (dbuffer[8 * 50 * irow + 8 * itime + 2] < 255)
+							dbuffer[8 * 50 * irow + 8 * itime + 2]++;
+						bit_img[8 * 50 * irow + 8 * itime + 2] = 0xff;
+					}
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q4)
+					{
+						if (dbuffer[8 * 50 * irow + 8 * itime + 3] < 255)
+							dbuffer[8 * 50 * irow + 8 * itime + 3]++;
+						bit_img[8 * 50 * irow + 8 * itime + 3] = 0xff;
+					}
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q5)
+					{
+						if (dbuffer[8 * 50 * irow + 8 * itime + 4] < 255)
+							dbuffer[8 * 50 * irow + 8 * itime + 4]++;
+						bit_img[8 * 50 * irow + 8 * itime + 4] = 0xff;
+					}
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q6)
+					{
+						if (dbuffer[8 * 50 * irow + 8 * itime + 5] < 255)
+							dbuffer[8 * 50 * irow + 8 * itime + 5]++;
+						bit_img[8 * 50 * irow + 8 * itime + 5] = 0xff;
+					}
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q7)
+					{
+						if (dbuffer[8 * 50 * irow + 8 * itime + 6] < 255)
+							dbuffer[8 * 50 * irow + 8 * itime + 6]++;
+						bit_img[8 * 50 * irow + 8 * itime + 6] = 0xff;
+					}
+					if (pulse[iframe * 50 * 250 + irow * 50 + itime] & q8)
+					{
+						if (dbuffer[8 * 50 * irow + 8 * itime + 7] < 255)
+							dbuffer[8 * 50 * irow + 8 * itime + 7]++;
+						bit_img[8 * 50 * irow + 8 * itime + 7] = 0xff;
+
+					}
+				}
+			}
+
+			
+
+		
+			flip(img_bit, img_bit, 0);
+			writer_bit.write(img_bit);
+
+		}
+/*
+		int tmp_map;
+		for (int i = 0; i < 400 * 250; i++) {
+			if (dbuffer[i] < 128) {
+				tmp_map = dbuffer[i];
+				dbuffer[i] = map_table[tmp_map];
+			}
+		}
+		
+		*/
+
+		flip(img, img, 0);
+		sprintf(tmp, "./%d.jpg", isize);
+		imwrite(tmp, img);
+		
+	}
+
+	MessageBox("数据处理完成\n");
+	delete[] pulse;
+	delete[] interval;
+	delete[] label;
+
+	m_raw2video = FALSE;
 
 
 }
